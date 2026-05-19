@@ -52,7 +52,6 @@ export default function Home() {
         const userStr = localStorage.getItem('user');
 
         if (!token || !userStr) {
-          // Trị Safari: Delay 100ms để nó không bị ngợp
           setTimeout(() => {
             window.location.href = '/login';
           }, 100);
@@ -63,7 +62,6 @@ export default function Home() {
         setIsCheckingAuth(false);
       } catch (error) {
         console.log('Lỗi đọc dữ liệu trên iPhone:', error);
-        // Xóa sạch dữ liệu lỗi (nếu có)
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         setTimeout(() => {
@@ -102,7 +100,6 @@ export default function Home() {
   const [showPinnedModal, setShowPinnedModal] = useState(false);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
 
-  // State quản lý Cuộc gọi tới
   const [incomingCall, setIncomingCall] = useState(null);
 
   const socketRef = useRef(null);
@@ -112,36 +109,28 @@ export default function Home() {
   const typingTimeoutRef = useRef(null);
   const avatarInputRef = useRef(null);
 
-  // 🔥 KHAI BÁO BIẾN CHỨA NHẠC CHUÔNG
   const ringtoneRef = useRef(null);
 
-  // State quản lý Hộp thoại Thu hồi
   const [recallModalData, setRecallModalData] = useState(null);
   const [recallOption, setRecallOption] = useState('everyone');
 
-  // Quản lý Modal Tạo Nhóm
   const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
   const [selectedMembers, setSelectedMembers] = useState([]);
 
   const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
 
-  // --- 1. SETUP NHẠC CHUÔNG LÚC KHỞI ĐỘNG ---
   useEffect(() => {
-    // Dùng tạm link âm thanh chuông kỹ thuật số
     ringtoneRef.current = new Audio(
       'https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg'
     );
-    ringtoneRef.current.loop = true; // Lặp lại cho đến khi nghe máy
+    ringtoneRef.current.loop = true;
   }, []);
 
-  // --- 2. BẬT/TẮT NHẠC TỰ ĐỘNG THEO TRẠNG THÁI CÓ CUỘC GỌI ---
   useEffect(() => {
     if (incomingCall) {
-      // Có cuộc gọi tới -> Phát nhạc
       ringtoneRef.current?.play().catch((e) => console.log('Trình duyệt chặn AutoPlay', e));
     } else {
-      // Bấm Nghe hoặc Từ chối -> Dừng nhạc
       if (ringtoneRef.current) {
         ringtoneRef.current.pause();
         ringtoneRef.current.currentTime = 0;
@@ -163,9 +152,7 @@ export default function Home() {
           `https://hookchat-e6ad.onrender.com/api/chat/conversations/user/${userId}`
         );
         setConversations(res.data);
-      } catch (error) {
-        console.log('Lỗi tải danh sách phòng chat', error);
-      }
+      } catch (error) {}
     };
 
     socketRef.current = io('https://hookchat-e6ad.onrender.com');
@@ -216,9 +203,7 @@ export default function Home() {
       if (data.senderId !== currentUser.id) setIsTyping(false);
     });
 
-    // --- LẮNG NGHE SÓNG GỌI TỚI ---
     socketRef.current.on('incoming_call', (callData) => {
-      // Đảm bảo mình nằm trong danh sách thành viên của phòng này (áp dụng cả 1-1 và nhóm)
       if (callData.participantIds.includes(currentUser.id)) {
         setIncomingCall(callData);
       }
@@ -254,10 +239,7 @@ export default function Home() {
       );
       setMessages(resMsgs.data);
 
-      socketRef.current.emit('mark_as_read', {
-        conversationId: conv._id,
-        userId: currentUser.id,
-      });
+      socketRef.current.emit('mark_as_read', { conversationId: conv._id, userId: currentUser.id });
 
       setShowEmojiPicker(false);
       setShowStickerPicker(false);
@@ -274,11 +256,8 @@ export default function Home() {
 
   const handleStartCall = (type) => {
     if (!activeConversation) return;
-
-    // Lấy ID của mọi người trong nhóm/phòng chat
     const participantIds = activeConversation.participants.map((p) => p._id || p);
 
-    // Bắn tín hiệu Socket báo có người gọi
     socketRef.current.emit('initiate_call', {
       callerId: currentUser.id,
       callerName: currentUser.name,
@@ -288,13 +267,11 @@ export default function Home() {
       participantIds: participantIds,
     });
 
-    // Ép trình duyệt tải lại trang để ZegoCloud khởi động chuẩn 100%
     window.location.href = `/call/${activeConversation._id}?type=${type}`;
   };
 
   const handleCreateNewChat = async () => {
     if (selectedMembers.length === 0) return alert('Vui lòng chọn bạn bè!');
-
     try {
       let resConv;
       if (selectedMembers.length === 1) {
@@ -418,9 +395,7 @@ export default function Home() {
 
       await axios.put(
         `https://hookchat-e6ad.onrender.com/api/chat/users/${currentUser.id}/avatar`,
-        {
-          avatarUrl: newAvatarUrl,
-        }
+        { avatarUrl: newAvatarUrl }
       );
 
       const updatedUser = { ...currentUser, avatar: newAvatarUrl };
@@ -446,9 +421,7 @@ export default function Home() {
     try {
       const response = await axios.put(
         `https://hookchat-e6ad.onrender.com/api/chat/users/${currentUser.id}/name`,
-        {
-          name: newName.trim(),
-        }
+        { name: newName.trim() }
       );
       const updatedUser = { ...currentUser, name: response.data.name };
       setCurrentUser(updatedUser);
@@ -523,7 +496,7 @@ export default function Home() {
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    router.push('/login');
+    window.location.href = '/login';
   };
 
   const formatLastActive = (lastSeenDate) => {
@@ -543,7 +516,6 @@ export default function Home() {
     return (
       <div className='flex h-[100dvh] flex-col items-center justify-center bg-[#242526] text-[#b0b3b8]'>
         <p className='mb-4 animate-pulse'>Đang tải dữ liệu...</p>
-        {/* Nút bấm dự phòng nếu Safari không tự động chuyển trang */}
         <button
           onClick={() => (window.location.href = '/login')}
           className='rounded-lg bg-[#0084ff] px-5 py-2 font-semibold text-white transition hover:bg-[#0073e6]'
@@ -560,7 +532,7 @@ export default function Home() {
   return (
     <div className='dark'>
       <div
-        className='relative flex h-[100dvh] w-full flex-col-reverse overflow-hidden bg-[#242526] font-sans text-[#e4e6eb] md:flex-row'
+        className='relative flex h-[100dvh] w-full flex-col overflow-hidden bg-[#242526] font-sans text-[#e4e6eb] md:flex-row'
         onClick={() => {
           setOpenMenuId(null);
           setActiveReactionId(null);
@@ -569,97 +541,261 @@ export default function Home() {
           setShowSettingsMenu(false);
         }}
       >
-        {/* === 1. MENU TRÁI CÙNG === */}
-        {/* === 1. THANH ĐIỀU HƯỚNG (BOTTOM TRÊN MOBILE, LEFT TRÊN DESKTOP) === */}
-        <div
-          className={`relative z-20 w-full shrink-0 flex-row items-center justify-between border-t border-gray-700 bg-[#242526] px-6 py-2 md:w-[68px] md:flex-col md:border-t-0 md:border-r md:px-0 md:py-4 ${activeConversation ? 'hidden md:flex' : 'flex'}`}
-        >
-          <div className='flex flex-row gap-8 md:flex-col md:gap-4'>
-            <button className='flex h-10 w-10 items-center justify-center rounded-full bg-gray-700 hover:bg-gray-600'>
-              💬
-            </button>
-            <button className='flex h-10 w-10 items-center justify-center rounded-full text-xl hover:bg-gray-700'>
-              👥
-            </button>
-            <button className='flex h-10 w-10 items-center justify-center rounded-full text-xl hover:bg-gray-700'>
-              🏪
-            </button>
-          </div>
+        {/* ==================================================== */}
+        {/* 🚀 CÁC HỘP THOẠI (MODAL) NỔI LÊN TOÀN MÀN HÌNH 🚀 */}
+        {/* Đưa ra ngoài cùng để không bao giờ bị ẩn trên Mobile */}
+        {/* ==================================================== */}
 
-          <div className='relative ml-auto flex items-center md:mt-auto md:ml-0 md:flex-col'>
-            {showSettingsMenu && (
-              <div
-                className='absolute right-0 bottom-14 z-50 w-[280px] overflow-hidden rounded-xl border border-gray-700 bg-[#242526] py-2 shadow-[0_0_15px_rgba(0,0,0,0.5)] md:right-auto md:bottom-12 md:left-4'
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className='flex cursor-pointer items-center justify-between px-4 py-2 text-[#e4e6eb] transition hover:bg-[#3a3b3c]'>
-                  <span className='font-semibold'>Tùy chọn</span>
-                  <span className='text-[#b0b3b8]'>⚙️</span>
-                </div>
-
-                <input
-                  type='file'
-                  ref={avatarInputRef}
-                  onChange={handleChangeAvatar}
-                  accept='image/*'
-                  className='hidden'
+        {/* 1. Modal Gọi điện Tới */}
+        {incomingCall && (
+          <div className='absolute inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm transition-opacity'>
+            <div className='animate-in zoom-in-95 flex w-[340px] flex-col items-center rounded-2xl border border-gray-700 bg-[#242526] p-8 shadow-[0_0_40px_rgba(0,132,255,0.3)]'>
+              <div className='relative mb-4 h-24 w-24'>
+                <div className='absolute inset-0 animate-ping rounded-full bg-[#0084ff] opacity-30'></div>
+                <img
+                  src={incomingCall.callerAvatar}
+                  alt='Caller'
+                  className='relative z-10 h-full w-full rounded-full border-4 border-[#242526] object-cover shadow-lg'
                 />
-                <div
-                  onClick={() => avatarInputRef.current.click()}
-                  className='flex cursor-pointer items-center justify-between px-4 py-2 text-[#e4e6eb] transition hover:bg-[#3a3b3c]'
-                >
-                  <span>{isUpdatingAvatar ? '⏳ Đang tải ảnh lên...' : '🖼️ Đổi ảnh đại diện'}</span>
-                </div>
-
-                <div
-                  onClick={handleChangeName}
-                  className='cursor-pointer px-4 py-2 text-[#e4e6eb] transition hover:bg-[#3a3b3c]'
-                >
-                  Chỉnh sửa tên người dùng
-                </div>
-                <div className='cursor-pointer px-4 py-2 text-[#e4e6eb] transition hover:bg-[#3a3b3c]'>
-                  Tài khoản đã hạn chế
-                </div>
-                <div className='flex cursor-pointer items-center justify-between px-4 py-2 text-[#e4e6eb] transition hover:bg-[#3a3b3c]'>
-                  Quyền riêng tư và an toàn <span>›</span>
-                </div>
-                <div className='cursor-pointer px-4 py-2 text-[#e4e6eb] transition hover:bg-[#3a3b3c]'>
-                  Trợ năng
-                </div>
-                <div className='my-1 border-t border-gray-700'></div>
-                <div className='cursor-pointer px-4 py-2 text-[#e4e6eb] transition hover:bg-[#3a3b3c]'>
-                  Trợ giúp
-                </div>
-                <div className='cursor-pointer px-4 py-2 text-[#e4e6eb] transition hover:bg-[#3a3b3c]'>
-                  Báo cáo sự cố
-                </div>
-                <div className='my-1 border-t border-gray-700'></div>
-                <div
-                  onClick={handleLogout}
-                  className='flex cursor-pointer items-center gap-2 px-4 py-2 text-[#e4e6eb] transition hover:bg-[#3a3b3c]'
-                >
-                  🚪 Đăng xuất
-                </div>
               </div>
-            )}
-
-            <div
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowSettingsMenu(!showSettingsMenu);
-              }}
-              className='h-10 w-10 cursor-pointer overflow-hidden rounded-full bg-blue-500 ring-2 ring-transparent transition hover:opacity-80'
-            >
-              <img
-                src={currentUser?.avatar || DEFAULT_AVATAR}
-                alt='Me'
-                className='h-full w-full object-cover'
-              />
+              <h2 className='mb-1 text-2xl font-bold text-white'>{incomingCall.callerName}</h2>
+              <p className='mb-8 text-[#b0b3b8]'>
+                Đang gọi {incomingCall.type === 'video' ? 'Video 🎥' : 'Thoại 📞'} cho bạn...
+              </p>
+              <div className='flex w-full justify-between gap-4 px-4'>
+                <button
+                  onClick={() => setIncomingCall(null)}
+                  className='group flex flex-1 flex-col items-center gap-2'
+                >
+                  <div className='flex h-14 w-14 items-center justify-center rounded-full bg-[#ff3b30] shadow-lg transition-transform group-hover:bg-[#ff1a1a] hover:scale-110'>
+                    <span className='rotate-[135deg] text-2xl text-white'>📞</span>
+                  </div>
+                  <span className='text-sm font-medium text-gray-300'>Từ chối</span>
+                </button>
+                <button
+                  onClick={() => {
+                    const callUrl = `/call/${incomingCall.roomId}?type=${incomingCall.type}`;
+                    setIncomingCall(null);
+                    window.location.href = callUrl;
+                  }}
+                  className='group flex flex-1 flex-col items-center gap-2'
+                >
+                  <div className='flex h-14 w-14 animate-bounce items-center justify-center rounded-full bg-[#34c759] shadow-lg transition-transform group-hover:bg-[#30d158] hover:scale-110'>
+                    <span className='text-2xl text-white'>📞</span>
+                  </div>
+                  <span className='text-sm font-medium text-gray-300'>Nghe máy</span>
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
-        {/* === 2. DANH SÁCH BẠN BÈ & NHÓM CHAT === */}
+        {/* 2. Modal Tạo Nhóm */}
+        {showCreateGroupModal && (
+          <div className='absolute inset-0 z-[100] flex items-center justify-center bg-black/60 transition-opacity'>
+            <div
+              className='animate-in zoom-in-95 flex w-[420px] flex-col overflow-hidden rounded-xl border border-gray-700 bg-[#242526] shadow-2xl'
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className='relative flex items-center justify-between border-b border-gray-700 p-4'>
+                <h2 className='w-full text-center text-[20px] font-bold text-[#e4e6eb]'>
+                  Tạo tin nhắn mới
+                </h2>
+                <button
+                  onClick={() => setShowCreateGroupModal(false)}
+                  className='absolute right-4 flex h-9 w-9 items-center justify-center rounded-full bg-[#3a3b3c] text-[#b0b3b8] transition hover:bg-[#4e4f50]'
+                >
+                  ✕
+                </button>
+              </div>
+              <div className='flex flex-col gap-4 p-4'>
+                {selectedMembers.length >= 2 && (
+                  <input
+                    type='text'
+                    value={newGroupName}
+                    onChange={(e) => setNewGroupName(e.target.value)}
+                    placeholder='Nhập tên nhóm...'
+                    className='w-full rounded-lg bg-[#3a3b3c] p-3 text-[15px] text-[#e4e6eb] outline-none'
+                  />
+                )}
+                <div>
+                  <h3 className='mt-2 mb-2 text-[14px] font-semibold text-[#b0b3b8]'>
+                    Chọn bạn bè để bắt đầu
+                  </h3>
+                  <div className='flex max-h-[200px] flex-col gap-1 overflow-y-auto pr-2'>
+                    {users.map((user) => (
+                      <label
+                        key={user._id}
+                        className='flex cursor-pointer items-center gap-3 rounded-lg p-2 transition hover:bg-[#3a3b3c]'
+                      >
+                        <input
+                          type='checkbox'
+                          className='h-5 w-5 cursor-pointer rounded-sm accent-[#0084ff]'
+                          checked={selectedMembers.includes(user._id)}
+                          onChange={(e) => {
+                            if (e.target.checked) setSelectedMembers((prev) => [...prev, user._id]);
+                            else setSelectedMembers((prev) => prev.filter((id) => id !== user._id));
+                          }}
+                        />
+                        <div className='h-10 w-10 shrink-0 overflow-hidden rounded-full bg-gray-600'>
+                          <img src={user.avatar || DEFAULT_AVATAR} alt={user.name} />
+                        </div>
+                        <span className='font-medium text-[#e4e6eb]'>{user.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className='flex justify-end gap-2 border-t border-gray-700 bg-[#242526] p-4'>
+                <button
+                  onClick={() => setShowCreateGroupModal(false)}
+                  className='rounded-lg px-5 py-2 font-semibold text-[#e4e6eb] transition hover:bg-[#3a3b3c]'
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={handleCreateNewChat}
+                  disabled={selectedMembers.length === 0}
+                  className='rounded-lg bg-[#0084ff] px-6 py-2 font-semibold text-white transition hover:bg-[#0073e6] disabled:cursor-not-allowed disabled:opacity-50'
+                >
+                  {selectedMembers.length > 1 ? 'Tạo Nhóm' : 'Chat'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 3. Modal Tin nhắn đã ghim */}
+        {showPinnedModal && (
+          <div className='absolute inset-0 z-50 flex items-center justify-center bg-black/60 transition-opacity'>
+            <div
+              className='animate-in zoom-in-95 flex max-h-[80vh] w-[480px] flex-col rounded-xl border border-gray-700 bg-[#242526] shadow-2xl'
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className='relative flex items-center justify-between border-b border-gray-700 p-4'>
+                <h2 className='w-full text-center text-[20px] font-bold text-[#e4e6eb]'>
+                  Tin nhắn đã ghim
+                </h2>
+                <button
+                  onClick={() => setShowPinnedModal(false)}
+                  className='absolute right-4 flex h-9 w-9 items-center justify-center rounded-full bg-[#3a3b3c] text-[#b0b3b8] transition hover:bg-[#4e4f50]'
+                >
+                  ✕
+                </button>
+              </div>
+              <div className='flex-1 overflow-y-auto p-2'>
+                {pinnedMessages.length === 0 ? (
+                  <div className='p-6 text-center text-[#b0b3b8]'>
+                    Chưa có tin nhắn nào được ghim.
+                  </div>
+                ) : (
+                  pinnedMessages.map((msg, idx) => (
+                    <div
+                      key={idx}
+                      onClick={() => {
+                        handleScrollToMessage(msg._id);
+                        setShowPinnedModal(false);
+                      }}
+                      className='group relative flex cursor-pointer items-center gap-3 rounded-xl p-3 transition hover:bg-[#3a3b3c]/50'
+                    >
+                      <div className='h-11 w-11 shrink-0 overflow-hidden rounded-full bg-gray-600'>
+                        <img src={msg.senderId?.avatar || DEFAULT_AVATAR} alt='Avatar' />
+                      </div>
+                      <div className='flex flex-1 flex-col overflow-hidden pr-10'>
+                        <div className='flex items-center gap-2'>
+                          <span className='text-[15px] font-semibold text-[#e4e6eb]'>
+                            {msg.senderId?._id === currentUser.id ? 'Bạn' : msg.senderId?.name}
+                          </span>
+                          <span className='text-[12px] text-[#b0b3b8]'>
+                            {new Date(msg.createdAt).toLocaleDateString('vi-VN')}
+                          </span>
+                        </div>
+                        <span className='mt-0.5 truncate text-[14px] text-[#b0b3b8]'>
+                          {msg.messageType === 'image'
+                            ? msg.mediaUrl?.includes('?type=sticker')
+                              ? '🧸 Nhãn dán'
+                              : '🖼️ Hình ảnh'
+                            : msg.text}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 4. Modal Thu hồi tin nhắn */}
+        {recallModalData && (
+          <div className='absolute inset-0 z-[100] flex items-center justify-center bg-black/60 transition-opacity'>
+            <div
+              className='animate-in zoom-in-95 flex w-[420px] flex-col rounded-xl border border-gray-700 bg-[#242526] shadow-2xl'
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className='relative flex items-center justify-between border-b border-gray-700 p-4'>
+                <h2 className='w-full text-left text-[20px] font-bold text-[#e4e6eb]'>
+                  Bạn muốn thu hồi tin nhắn này ở phía ai?
+                </h2>
+                <button
+                  onClick={() => setRecallModalData(null)}
+                  className='absolute right-4 flex h-9 w-9 items-center justify-center rounded-full bg-[#3a3b3c] text-[#b0b3b8] transition hover:bg-[#4e4f50]'
+                >
+                  ✕
+                </button>
+              </div>
+              <div className='flex flex-col gap-5 p-4'>
+                {(recallModalData.senderId?._id === currentUser.id ||
+                  recallModalData.senderId === currentUser.id) && (
+                  <label className='group flex cursor-pointer items-start gap-3'>
+                    <input
+                      type='radio'
+                      value='everyone'
+                      checked={recallOption === 'everyone'}
+                      onChange={() => setRecallOption('everyone')}
+                      className='mt-1.5 h-5 w-5 shrink-0 cursor-pointer accent-[#0084ff]'
+                    />
+                    <span className='text-[15px] font-semibold text-[#e4e6eb]'>
+                      Thu hồi với mọi người
+                    </span>
+                  </label>
+                )}
+                <label className='group flex cursor-pointer items-start gap-3'>
+                  <input
+                    type='radio'
+                    value='only_me'
+                    checked={recallOption === 'only_me'}
+                    onChange={() => setRecallOption('only_me')}
+                    className='mt-1.5 h-5 w-5 shrink-0 cursor-pointer accent-[#0084ff]'
+                  />
+                  <span className='text-[15px] font-semibold text-[#e4e6eb]'>Thu hồi với bạn</span>
+                </label>
+              </div>
+              <div className='mt-2 flex justify-end gap-2 p-4'>
+                <button
+                  onClick={() => setRecallModalData(null)}
+                  className='rounded-lg px-5 py-2 font-semibold text-[#0084ff] transition hover:bg-[#3a3b3c]'
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={() => {
+                    if (recallOption === 'everyone') handleRecallMessage(recallModalData._id);
+                    else setMessages((prev) => prev.filter((m) => m._id !== recallModalData._id));
+                    setRecallModalData(null);
+                  }}
+                  className='rounded-lg bg-[#0084ff] px-6 py-2 font-semibold text-white transition hover:bg-[#0073e6]'
+                >
+                  Gỡ
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ==================================================== */}
+        {/* CỘT 1: DANH SÁCH BẠN BÈ & NHÓM CHAT (Đứng giữa trên Desktop) */}
+        {/* ==================================================== */}
         <div
           className={`relative z-10 w-full flex-1 shrink-0 flex-col border-r border-gray-700 bg-[#242526] md:w-[360px] md:flex-none ${activeConversation ? 'hidden md:flex' : 'flex'}`}
         >
@@ -667,7 +803,10 @@ export default function Home() {
             <div className='mb-4 flex items-center justify-between'>
               <h1 className='text-2xl font-bold'>Đoạn chat</h1>
               <button
-                onClick={() => setShowCreateGroupModal(true)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowCreateGroupModal(true);
+                }}
                 className='flex h-9 w-9 items-center justify-center rounded-full bg-[#3a3b3c] text-[15px] transition hover:bg-[#4e4f50]'
               >
                 ✏️
@@ -710,7 +849,10 @@ export default function Home() {
               return (
                 <div
                   key={conv._id}
-                  onClick={() => handleSelectConversation(conv)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleSelectConversation(conv);
+                  }}
                   className={`flex cursor-pointer items-center px-4 py-3 transition ${activeConversation?._id === conv._id ? 'bg-[#3a3b3c]' : 'hover:bg-[#3a3b3c]/50'}`}
                 >
                   <div className='relative h-14 w-14 shrink-0'>
@@ -778,260 +920,12 @@ export default function Home() {
           </div>
         </div>
 
-        {/* === 3. KHUNG CHAT CHÍNH === */}
+        {/* ==================================================== */}
+        {/* CỘT 2: KHUNG CHAT CHÍNH (Nằm bên phải trên Desktop) */}
+        {/* ==================================================== */}
         <div
           className={`relative flex w-full min-w-0 flex-1 flex-col bg-[#242526] ${!activeConversation ? 'hidden md:flex' : 'flex'}`}
         >
-          {/* 🔥 MODAL ĐỔ CHUÔNG (ĐÃ ĐƯỢC CHUYỂN RA NGOÀI CÙNG ĐỂ KHÔNG BỊ LỖI HIỂN THỊ) 🔥 */}
-          {incomingCall && (
-            <div className='absolute inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm transition-opacity'>
-              <div className='animate-in zoom-in-95 flex w-[340px] flex-col items-center rounded-2xl border border-gray-700 bg-[#242526] p-8 shadow-[0_0_40px_rgba(0,132,255,0.3)]'>
-                {/* Hiệu ứng sóng tỏa ra (Radar) */}
-                <div className='relative mb-4 h-24 w-24'>
-                  <div className='absolute inset-0 animate-ping rounded-full bg-[#0084ff] opacity-30'></div>
-                  <img
-                    src={incomingCall.callerAvatar}
-                    alt='Caller'
-                    className='relative z-10 h-full w-full rounded-full border-4 border-[#242526] object-cover shadow-lg'
-                  />
-                </div>
-                <h2 className='mb-1 text-2xl font-bold text-white'>{incomingCall.callerName}</h2>
-                <p className='mb-8 text-[#b0b3b8]'>
-                  Đang gọi {incomingCall.type === 'video' ? 'Video 🎥' : 'Thoại 📞'} cho bạn...
-                </p>
-                <div className='flex w-full justify-between gap-4 px-4'>
-                  <button
-                    onClick={() => setIncomingCall(null)}
-                    className='group flex flex-1 flex-col items-center gap-2'
-                  >
-                    <div className='flex h-14 w-14 items-center justify-center rounded-full bg-[#ff3b30] shadow-lg transition-transform group-hover:bg-[#ff1a1a] hover:scale-110'>
-                      <span className='rotate-[135deg] text-2xl text-white'>📞</span>
-                    </div>
-                    <span className='text-sm font-medium text-gray-300'>Từ chối</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      const callUrl = `/call/${incomingCall.roomId}?type=${incomingCall.type}`;
-                      setIncomingCall(null);
-                      window.location.href = callUrl; // Chuyển trang cứng
-                    }}
-                    className='group flex flex-1 flex-col items-center gap-2'
-                  >
-                    <div className='flex h-14 w-14 animate-bounce items-center justify-center rounded-full bg-[#34c759] shadow-lg transition-transform group-hover:bg-[#30d158] hover:scale-110'>
-                      <span className='text-2xl text-white'>📞</span>
-                    </div>
-                    <span className='text-sm font-medium text-gray-300'>Nghe máy</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* CÁC MODAL KHÁC (TẠO NHÓM, GHIM, THU HỒI...) */}
-          {showCreateGroupModal && (
-            <div className='absolute inset-0 z-[100] flex items-center justify-center bg-black/60 transition-opacity'>
-              <div
-                className='animate-in zoom-in-95 flex w-[420px] flex-col overflow-hidden rounded-xl border border-gray-700 bg-[#242526] shadow-2xl'
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className='relative flex items-center justify-between border-b border-gray-700 p-4'>
-                  <h2 className='w-full text-center text-[20px] font-bold text-[#e4e6eb]'>
-                    Tạo tin nhắn mới
-                  </h2>
-                  <button
-                    onClick={() => setShowCreateGroupModal(false)}
-                    className='absolute right-4 flex h-9 w-9 items-center justify-center rounded-full bg-[#3a3b3c] text-[#b0b3b8] transition hover:bg-[#4e4f50]'
-                  >
-                    ✕
-                  </button>
-                </div>
-                <div className='flex flex-col gap-4 p-4'>
-                  {selectedMembers.length >= 2 && (
-                    <input
-                      type='text'
-                      value={newGroupName}
-                      onChange={(e) => setNewGroupName(e.target.value)}
-                      placeholder='Nhập tên nhóm...'
-                      className='w-full rounded-lg bg-[#3a3b3c] p-3 text-[15px] text-[#e4e6eb] outline-none'
-                    />
-                  )}
-                  <div>
-                    <h3 className='mt-2 mb-2 text-[14px] font-semibold text-[#b0b3b8]'>
-                      Chọn bạn bè để bắt đầu
-                    </h3>
-                    <div className='flex max-h-[200px] flex-col gap-1 overflow-y-auto pr-2'>
-                      {users.map((user) => (
-                        <label
-                          key={user._id}
-                          className='flex cursor-pointer items-center gap-3 rounded-lg p-2 transition hover:bg-[#3a3b3c]'
-                        >
-                          <input
-                            type='checkbox'
-                            className='h-5 w-5 cursor-pointer rounded-sm accent-[#0084ff]'
-                            checked={selectedMembers.includes(user._id)}
-                            onChange={(e) => {
-                              if (e.target.checked)
-                                setSelectedMembers((prev) => [...prev, user._id]);
-                              else
-                                setSelectedMembers((prev) => prev.filter((id) => id !== user._id));
-                            }}
-                          />
-                          <div className='h-10 w-10 shrink-0 overflow-hidden rounded-full bg-gray-600'>
-                            <img src={user.avatar || DEFAULT_AVATAR} alt={user.name} />
-                          </div>
-                          <span className='font-medium text-[#e4e6eb]'>{user.name}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                <div className='flex justify-end gap-2 border-t border-gray-700 bg-[#242526] p-4'>
-                  <button
-                    onClick={() => setShowCreateGroupModal(false)}
-                    className='rounded-lg px-5 py-2 font-semibold text-[#e4e6eb] transition hover:bg-[#3a3b3c]'
-                  >
-                    Hủy
-                  </button>
-                  <button
-                    onClick={handleCreateNewChat}
-                    disabled={selectedMembers.length === 0}
-                    className='rounded-lg bg-[#0084ff] px-6 py-2 font-semibold text-white transition hover:bg-[#0073e6] disabled:cursor-not-allowed disabled:opacity-50'
-                  >
-                    {selectedMembers.length > 1 ? 'Tạo Nhóm' : 'Chat'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {showPinnedModal && (
-            <div className='absolute inset-0 z-50 flex items-center justify-center bg-black/60 transition-opacity'>
-              <div
-                className='animate-in zoom-in-95 flex max-h-[80vh] w-[480px] flex-col rounded-xl border border-gray-700 bg-[#242526] shadow-2xl'
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className='relative flex items-center justify-between border-b border-gray-700 p-4'>
-                  <h2 className='w-full text-center text-[20px] font-bold text-[#e4e6eb]'>
-                    Tin nhắn đã ghim
-                  </h2>
-                  <button
-                    onClick={() => setShowPinnedModal(false)}
-                    className='absolute right-4 flex h-9 w-9 items-center justify-center rounded-full bg-[#3a3b3c] text-[#b0b3b8] transition hover:bg-[#4e4f50]'
-                  >
-                    ✕
-                  </button>
-                </div>
-                <div className='flex-1 overflow-y-auto p-2'>
-                  {pinnedMessages.length === 0 ? (
-                    <div className='p-6 text-center text-[#b0b3b8]'>
-                      Chưa có tin nhắn nào được ghim.
-                    </div>
-                  ) : (
-                    pinnedMessages.map((msg, idx) => (
-                      <div
-                        key={idx}
-                        onClick={() => {
-                          handleScrollToMessage(msg._id);
-                          setShowPinnedModal(false);
-                        }}
-                        className='group relative flex cursor-pointer items-center gap-3 rounded-xl p-3 transition hover:bg-[#3a3b3c]/50'
-                      >
-                        <div className='h-11 w-11 shrink-0 overflow-hidden rounded-full bg-gray-600'>
-                          <img src={msg.senderId?.avatar || DEFAULT_AVATAR} alt='Avatar' />
-                        </div>
-                        <div className='flex flex-1 flex-col overflow-hidden pr-10'>
-                          <div className='flex items-center gap-2'>
-                            <span className='text-[15px] font-semibold text-[#e4e6eb]'>
-                              {msg.senderId?._id === currentUser.id ? 'Bạn' : msg.senderId?.name}
-                            </span>
-                            <span className='text-[12px] text-[#b0b3b8]'>
-                              {new Date(msg.createdAt).toLocaleDateString('vi-VN')}
-                            </span>
-                          </div>
-                          <span className='mt-0.5 truncate text-[14px] text-[#b0b3b8]'>
-                            {msg.messageType === 'image'
-                              ? msg.mediaUrl?.includes('?type=sticker')
-                                ? '🧸 Nhãn dán'
-                                : '🖼️ Hình ảnh'
-                              : msg.text}
-                          </span>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {recallModalData && (
-            <div className='absolute inset-0 z-[100] flex items-center justify-center bg-black/60 transition-opacity'>
-              <div
-                className='animate-in zoom-in-95 flex w-[420px] flex-col rounded-xl border border-gray-700 bg-[#242526] shadow-2xl'
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className='relative flex items-center justify-between border-b border-gray-700 p-4'>
-                  <h2 className='w-full text-left text-[20px] font-bold text-[#e4e6eb]'>
-                    Bạn muốn thu hồi tin nhắn này ở phía ai?
-                  </h2>
-                  <button
-                    onClick={() => setRecallModalData(null)}
-                    className='absolute right-4 flex h-9 w-9 items-center justify-center rounded-full bg-[#3a3b3c] text-[#b0b3b8] transition hover:bg-[#4e4f50]'
-                  >
-                    ✕
-                  </button>
-                </div>
-                <div className='flex flex-col gap-5 p-4'>
-                  {(recallModalData.senderId?._id === currentUser.id ||
-                    recallModalData.senderId === currentUser.id) && (
-                    <label className='group flex cursor-pointer items-start gap-3'>
-                      <input
-                        type='radio'
-                        value='everyone'
-                        checked={recallOption === 'everyone'}
-                        onChange={() => setRecallOption('everyone')}
-                        className='mt-1.5 h-5 w-5 shrink-0 cursor-pointer accent-[#0084ff]'
-                      />
-                      <span className='text-[15px] font-semibold text-[#e4e6eb]'>
-                        Thu hồi với mọi người
-                      </span>
-                    </label>
-                  )}
-                  <label className='group flex cursor-pointer items-start gap-3'>
-                    <input
-                      type='radio'
-                      value='only_me'
-                      checked={recallOption === 'only_me'}
-                      onChange={() => setRecallOption('only_me')}
-                      className='mt-1.5 h-5 w-5 shrink-0 cursor-pointer accent-[#0084ff]'
-                    />
-                    <span className='text-[15px] font-semibold text-[#e4e6eb]'>
-                      Thu hồi với bạn
-                    </span>
-                  </label>
-                </div>
-                <div className='mt-2 flex justify-end gap-2 p-4'>
-                  <button
-                    onClick={() => setRecallModalData(null)}
-                    className='rounded-lg px-5 py-2 font-semibold text-[#0084ff] transition hover:bg-[#3a3b3c]'
-                  >
-                    Hủy
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (recallOption === 'everyone') handleRecallMessage(recallModalData._id);
-                      else setMessages((prev) => prev.filter((m) => m._id !== recallModalData._id));
-                      setRecallModalData(null);
-                    }}
-                    className='rounded-lg bg-[#0084ff] px-6 py-2 font-semibold text-white transition hover:bg-[#0073e6]'
-                  >
-                    Gỡ
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
           {activeConversation ? (
             <>
               {(() => {
@@ -1067,7 +961,10 @@ export default function Home() {
                   <div className='z-10 flex h-[68px] shrink-0 items-center justify-between border-b border-gray-700 bg-[#242526] px-4 shadow-sm'>
                     <div className='flex items-center'>
                       <button
-                        onClick={() => setActiveConversation(null)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveConversation(null);
+                        }}
                         className='mr-2 flex h-8 w-8 items-center justify-center rounded-full text-xl text-[#b0b3b8] transition hover:bg-[#3a3b3c] md:hidden'
                       >
                         ❮
@@ -1089,13 +986,19 @@ export default function Home() {
                     </div>
                     <div className='flex items-center gap-2 text-[#0084ff]'>
                       <button
-                        onClick={() => handleStartCall('voice')}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleStartCall('voice');
+                        }}
                         className='flex h-9 w-9 items-center justify-center rounded-full text-[18px] transition hover:bg-[#3a3b3c]'
                       >
                         📞
                       </button>
                       <button
-                        onClick={() => handleStartCall('video')}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleStartCall('video');
+                        }}
                         className='flex h-9 w-9 items-center justify-center rounded-full text-[18px] transition hover:bg-[#3a3b3c]'
                       >
                         🎥
@@ -1110,7 +1013,10 @@ export default function Home() {
 
               {pinnedMessages.length > 0 && (
                 <div
-                  onClick={() => setShowPinnedModal(true)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowPinnedModal(true);
+                  }}
                   className='z-10 flex shrink-0 cursor-pointer items-center justify-between border-b border-gray-700/50 bg-[#242526] px-4 py-3 shadow-sm transition hover:bg-[#3a3b3c]/30'
                 >
                   <div className='flex items-center gap-3 overflow-hidden'>
@@ -1197,7 +1103,10 @@ export default function Home() {
                           )}
                         </div>
                         <button
-                          onClick={() => setReplyingTo(msg)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setReplyingTo(msg);
+                          }}
                           className='flex h-8 w-8 items-center justify-center rounded-full text-[18px] transition hover:bg-[#3a3b3c] hover:text-[#e4e6eb]'
                         >
                           ↩️
@@ -1411,7 +1320,10 @@ export default function Home() {
                       </span>
                     </div>
                     <button
-                      onClick={() => setReplyingTo(null)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setReplyingTo(null);
+                      }}
                       className='flex h-7 w-7 items-center justify-center rounded-full bg-[#3a3b3c] text-gray-400 transition hover:text-[#e4e6eb]'
                     >
                       ✕
@@ -1433,13 +1345,17 @@ export default function Home() {
                     className='hidden'
                   />
                   <button
-                    onClick={() => fileInputRef.current.click()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      fileInputRef.current.click();
+                    }}
                     className='relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xl text-[#0084ff] transition hover:bg-[#3a3b3c]'
                   >
                     🖼️
                   </button>
                   <button
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       setShowStickerPicker(!showStickerPicker);
                       setShowEmojiPicker(false);
                       setShowSettingsMenu(false);
@@ -1460,7 +1376,8 @@ export default function Home() {
                       className='min-w-0 flex-1 bg-transparent py-2.5 text-[15px] outline-none'
                     />
                     <button
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation();
                         setShowEmojiPicker(!showEmojiPicker);
                         setShowStickerPicker(false);
                         setShowSettingsMenu(false);
@@ -1471,7 +1388,10 @@ export default function Home() {
                     </button>
                   </div>
                   <button
-                    onClick={inputText.trim() ? handleSendMessage : handleSendLike}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      inputText.trim() ? handleSendMessage() : handleSendLike();
+                    }}
                     className='flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xl font-bold text-[#0084ff] transition hover:bg-[#3a3b3c]'
                   >
                     {inputText.trim() ? 'Gửi' : '👍'}
@@ -1483,7 +1403,10 @@ export default function Home() {
                         {STICKER_PACKS.map((pack) => (
                           <button
                             key={pack.id}
-                            onClick={() => setActiveStickerTab(pack.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveStickerTab(pack.id);
+                            }}
                             className={`flex h-10 w-10 items-center justify-center rounded-lg text-xl transition ${activeStickerTab === pack.id ? 'border-b-2 border-[#0084ff] bg-[#4e4f50]' : 'hover:bg-[#3a3b3c]/50'}`}
                           >
                             {pack.icon}
@@ -1495,7 +1418,10 @@ export default function Home() {
                           (url, idx) => (
                             <div
                               key={idx}
-                              onClick={() => handleSendSticker(url)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSendSticker(url);
+                              }}
                               className='flex cursor-pointer items-center justify-center rounded-xl p-1.5 transition-colors hover:bg-[#3a3b3c]/80'
                             >
                               <img
@@ -1530,6 +1456,115 @@ export default function Home() {
               <p>Chọn một người bạn ở cột bên trái hoặc bấm ✏️ để bắt đầu</p>
             </div>
           )}
+        </div>
+
+        {/* ==================================================== */}
+        {/* CỘT 3: THANH ĐIỀU HƯỚNG (Nằm dưới cùng trên Mobile, Bên trái trên Desktop) */}
+        {/* ==================================================== */}
+        <div
+          className={`relative z-20 w-full shrink-0 flex-row items-center justify-between border-t border-gray-700 bg-[#242526] px-6 py-2 md:order-first md:w-[68px] md:flex-col md:border-t-0 md:border-r md:px-0 md:py-4 ${activeConversation ? 'hidden md:flex' : 'flex'}`}
+        >
+          <div className='flex flex-row gap-8 md:flex-col md:gap-4'>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                alert('Chức năng Tin nhắn đang hoạt động!');
+              }}
+              className='flex h-10 w-10 items-center justify-center rounded-full bg-gray-700 hover:bg-gray-600'
+            >
+              💬
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                alert('Chức năng Danh bạ đang phát triển!');
+              }}
+              className='flex h-10 w-10 items-center justify-center rounded-full text-xl hover:bg-gray-700'
+            >
+              👥
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                alert('Chức năng Cửa hàng đang phát triển!');
+              }}
+              className='flex h-10 w-10 items-center justify-center rounded-full text-xl hover:bg-gray-700'
+            >
+              🏪
+            </button>
+          </div>
+
+          <div className='relative ml-auto flex items-center md:mt-auto md:ml-0 md:flex-col'>
+            {showSettingsMenu && (
+              <div
+                className='absolute right-0 bottom-14 z-50 w-[280px] overflow-hidden rounded-xl border border-gray-700 bg-[#242526] py-2 shadow-[0_0_15px_rgba(0,0,0,0.5)] md:right-auto md:bottom-12 md:left-4'
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className='flex cursor-pointer items-center justify-between px-4 py-2 text-[#e4e6eb] transition hover:bg-[#3a3b3c]'>
+                  <span className='font-semibold'>Tùy chọn</span>
+                  <span className='text-[#b0b3b8]'>⚙️</span>
+                </div>
+
+                <input
+                  type='file'
+                  ref={avatarInputRef}
+                  onChange={handleChangeAvatar}
+                  accept='image/*'
+                  className='hidden'
+                />
+                <div
+                  onClick={() => avatarInputRef.current.click()}
+                  className='flex cursor-pointer items-center justify-between px-4 py-2 text-[#e4e6eb] transition hover:bg-[#3a3b3c]'
+                >
+                  <span>{isUpdatingAvatar ? '⏳ Đang tải ảnh lên...' : '🖼️ Đổi ảnh đại diện'}</span>
+                </div>
+
+                <div
+                  onClick={handleChangeName}
+                  className='cursor-pointer px-4 py-2 text-[#e4e6eb] transition hover:bg-[#3a3b3c]'
+                >
+                  Chỉnh sửa tên người dùng
+                </div>
+                <div className='cursor-pointer px-4 py-2 text-[#e4e6eb] transition hover:bg-[#3a3b3c]'>
+                  Tài khoản đã hạn chế
+                </div>
+                <div className='flex cursor-pointer items-center justify-between px-4 py-2 text-[#e4e6eb] transition hover:bg-[#3a3b3c]'>
+                  Quyền riêng tư và an toàn <span>›</span>
+                </div>
+                <div className='cursor-pointer px-4 py-2 text-[#e4e6eb] transition hover:bg-[#3a3b3c]'>
+                  Trợ năng
+                </div>
+                <div className='my-1 border-t border-gray-700'></div>
+                <div className='cursor-pointer px-4 py-2 text-[#e4e6eb] transition hover:bg-[#3a3b3c]'>
+                  Trợ giúp
+                </div>
+                <div className='cursor-pointer px-4 py-2 text-[#e4e6eb] transition hover:bg-[#3a3b3c]'>
+                  Báo cáo sự cố
+                </div>
+                <div className='my-1 border-t border-gray-700'></div>
+                <div
+                  onClick={handleLogout}
+                  className='flex cursor-pointer items-center gap-2 px-4 py-2 text-[#e4e6eb] transition hover:bg-[#3a3b3c]'
+                >
+                  🚪 Đăng xuất
+                </div>
+              </div>
+            )}
+
+            <div
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowSettingsMenu(!showSettingsMenu);
+              }}
+              className='h-10 w-10 cursor-pointer overflow-hidden rounded-full bg-blue-500 ring-2 ring-transparent transition hover:opacity-80'
+            >
+              <img
+                src={currentUser?.avatar || DEFAULT_AVATAR}
+                alt='Me'
+                className='h-full w-full object-cover'
+              />
+            </div>
+          </div>
         </div>
       </div>
     </div>
