@@ -211,14 +211,10 @@ export default function Home() {
     });
 
     // 🔥 MÁY A LẮNG NGHE MÁY B BẤM "NGHE MÁY" ĐỂ CÙNG NHAU VÀO PHÒNG
+    // 🔥 MÁY A LẮNG NGHE MÁY B BẤM "NGHE MÁY"
     socketRef.current.on('call_accepted', (data) => {
-      setOutgoingCall((prev) => {
-        if (prev && prev.roomId === data.roomId) {
-          window.location.href = `/call/${prev.roomId}?type=${prev.type}`;
-          return null;
-        }
-        return prev;
-      });
+      // Nhận được tín hiệu là bẻ lái thẳng luôn, không thông qua State của React nữa!
+      window.location.href = `/call/${data.roomId}?type=${data.type}`;
     });
 
     socketRef.current.on('messages_read', ({ conversationId }) => {
@@ -648,6 +644,7 @@ export default function Home() {
                     socketRef.current.emit('accept_call', {
                       roomId: incomingCall.roomId,
                       participantIds: incomingCall.participantIds,
+                      type: incomingCall.type,
                     });
 
                     const callUrl = `/call/${incomingCall.roomId}?type=${incomingCall.type}`;
