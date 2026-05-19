@@ -698,7 +698,7 @@ const handleTyping = (e) => {
         </div>
 
         {/* === 3. KHUNG CHAT CHÍNH === */}
-        <div className="flex-1 flex flex-col bg-[#242526] min-w-[400px] relative">
+        <div className="flex-1 flex flex-col bg-[#242526] min-w-0 w-full relative">
           
           {/* 🔥 MODAL: TẠO TIN NHẮN / TẠO NHÓM MỚI */}
           {showCreateGroupModal && (
@@ -1220,9 +1220,9 @@ return (
                   </div>
                 )}
 
-                <div 
-                  className="p-3 px-4 flex items-center gap-2 shrink-0 relative"
-                  onClick={(e) => e.stopPropagation()} 
+              <div 
+                className="p-2 px-2 sm:p-3 sm:px-4 flex items-center gap-1.5 sm:gap-2 shrink-0 relative w-full"
+                onClick={(e) => e.stopPropagation()} 
                 >
                   <button className="text-[#0084ff] text-2xl hover:bg-[#3a3b3c] w-9 h-9 flex items-center justify-center rounded-full transition shrink-0">⊕</button>
                   
