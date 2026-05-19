@@ -148,6 +148,11 @@ io.on("connection", (socket) => {
     socket.broadcast.emit("incoming_call", data);
   });
 
+  // 🔥 THÊM SỰ KIỆN NÀY: MÁY B BÁO CHO MÁY A BIẾT LÀ ĐÃ BẤM NGHE MÁY
+  socket.on("accept_call", (data) => {
+    socket.broadcast.emit("call_accepted", data);
+  });
+
   socket.on("react_message", async (data) => {
     const { messageId, userId, emoji, conversationId } = data;
     try {
