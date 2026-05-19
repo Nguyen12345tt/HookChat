@@ -110,6 +110,7 @@ export default function Home() {
 
   // Quản lý Gọi điện & Nhạc chuông
   const [incomingCall, setIncomingCall] = useState(null); // Có ai đang gọi tới không
+  const [outgoingCall, setOutgoingCall] = useState(null); // 🔥 LƯU TRẠNG THÁI MÁY A ĐANG ĐỢI MÁY B
   const ringtoneRef = useRef(null); // Loa phát nhạc chuông
 
   // Quản lý Modal Thu hồi & Tạo nhóm
@@ -198,13 +199,26 @@ export default function Home() {
       });
       fetchConversationsSafe(currentUser.id);
 
-      // 🔥 Tự động tắt bảng đổ chuông nếu người A hủy hoặc quá hạn cuộc gọi
-      if (
-        newMsg.messageType === 'call' &&
-        (newMsg.text === 'canceled' || newMsg.text === 'missed')
-      ) {
-        setIncomingCall((prev) => (prev && prev.roomId === newMsg.conversationId ? null : prev));
+      // 🔥 LOGIC TỰ ĐÓNG BẢNG GỌI NẾU BỊ HỦY / TỪ CHỐI
+      if (newMsg.messageType === 'call') {
+        if (newMsg.text === 'canceled' || newMsg.text === 'missed') {
+          setIncomingCall((prev) => (prev && prev.roomId === newMsg.conversationId ? null : prev)); // Máy B tự tắt chuông
+        }
+        if (newMsg.text === 'rejected' || newMsg.text === 'missed') {
+          setOutgoingCall((prev) => (prev && prev.roomId === newMsg.conversationId ? null : prev)); // Máy A tự tắt bảng Đợi
+        }
       }
+    });
+
+    // 🔥 MÁY A LẮNG NGHE MÁY B BẤM "NGHE MÁY" ĐỂ CÙNG NHAU VÀO PHÒNG
+    socketRef.current.on('call_accepted', (data) => {
+      setOutgoingCall((prev) => {
+        if (prev && prev.roomId === data.roomId) {
+          window.location.href = `/call/${prev.roomId}?type=${prev.type}`;
+          return null;
+        }
+        return prev;
+      });
     });
 
     socketRef.current.on('messages_read', ({ conversationId }) => {
@@ -298,21 +312,38 @@ export default function Home() {
     } catch (error) {}
   };
 
-  // Khởi tạo cuộc gọi Video/Voice
   const handleStartCall = (type) => {
     if (!activeConversation) return;
     const participantIds = activeConversation.participants.map((p) => p._id || p);
 
-    socketRef.current.emit('initiate_call', {
+    // Lấy thông tin người/nhóm mình chuẩn bị gọi để hiện lên UI Đang gọi
+    let partnerName = 'Nhóm';
+    let partnerAvatar = DEFAULT_GROUP_AVATAR;
+    if (!activeConversation.isGroup) {
+      let partner = activeConversation.participants?.find((p) => (p._id || p) !== currentUser.id);
+      if (!partner) partner = activeConversation.participants?.[0];
+      if (partner) {
+        partnerName = partner.name;
+        partnerAvatar = partner.avatar;
+      }
+    }
+
+    const callData = {
       callerId: currentUser.id,
       callerName: currentUser.name,
       callerAvatar: currentUser.avatar || DEFAULT_AVATAR,
       roomId: activeConversation._id,
       type: type,
       participantIds: participantIds,
-    });
+      partnerName,
+      partnerAvatar,
+    };
 
-    window.location.href = `/call/${activeConversation._id}?type=${type}`;
+    // 1. Hiện bảng Đang gọi (cho Máy A)
+    setOutgoingCall(callData);
+
+    // 2. Bắn tín hiệu Đổ chuông sang Máy B
+    socketRef.current.emit('initiate_call', callData);
   };
 
   // Tạo nhóm mới hoặc chat 1-1
@@ -613,14 +644,15 @@ export default function Home() {
               <div className='flex w-full justify-between gap-4 px-4'>
                 <button
                   onClick={() => {
-                    socketRef.current.emit('send_message', {
-                      conversationId: incomingCall.roomId,
-                      senderId: incomingCall.callerId, // Ép A làm người gửi
-                      text: 'rejected',
-                      messageType: 'call',
-                      mediaUrl: '',
+                    // 🔥 MÁY B BẮN TÍN HIỆU CHO MÁY A BIẾT LÀ ĐÃ ĐỒNG Ý
+                    socketRef.current.emit('accept_call', {
+                      roomId: incomingCall.roomId,
+                      participantIds: incomingCall.participantIds,
                     });
+
+                    const callUrl = `/call/${incomingCall.roomId}?type=${incomingCall.type}`;
                     setIncomingCall(null);
+                    window.location.href = callUrl;
                   }}
                   className='group flex flex-1 flex-col items-center gap-2'
                 >
@@ -643,6 +675,45 @@ export default function Home() {
                   <span className='text-sm font-medium text-gray-300'>Nghe máy</span>
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* --- 🔥 MODAL ĐANG GỌI ĐI (DÀNH CHO MÁY A NGỒI ĐỢI) 🔥 --- */}
+        {outgoingCall && (
+          <div className='absolute inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm transition-opacity'>
+            <div className='animate-in zoom-in-95 flex w-[340px] flex-col items-center rounded-2xl border border-gray-700 bg-[#242526] p-8 shadow-[0_0_40px_rgba(0,132,255,0.3)]'>
+              <div className='relative mb-4 h-24 w-24'>
+                <div className='absolute inset-0 animate-pulse rounded-full bg-[#34c759] opacity-30'></div>
+                <img
+                  src={outgoingCall.partnerAvatar}
+                  alt='Partner'
+                  className='relative z-10 h-full w-full rounded-full border-4 border-[#242526] object-cover shadow-lg'
+                />
+              </div>
+              <h2 className='mb-1 text-2xl font-bold text-white'>{outgoingCall.partnerName}</h2>
+              <p className='mb-8 text-[#b0b3b8]'>
+                Đang gọi {outgoingCall.type === 'video' ? 'Video 🎥' : 'Thoại 📞'}...
+              </p>
+              <button
+                onClick={() => {
+                  // A đổi ý, bấm Hủy gọi
+                  socketRef.current.emit('send_message', {
+                    conversationId: outgoingCall.roomId,
+                    senderId: currentUser.id,
+                    text: 'canceled',
+                    messageType: 'call',
+                    mediaUrl: '',
+                  });
+                  setOutgoingCall(null);
+                }}
+                className='group flex flex-col items-center gap-2'
+              >
+                <div className='flex h-14 w-14 items-center justify-center rounded-full bg-[#ff3b30] shadow-lg transition-transform group-hover:bg-[#ff1a1a] hover:scale-110'>
+                  <span className='rotate-[135deg] text-2xl text-white'>📞</span>
+                </div>
+                <span className='text-sm font-medium text-gray-300'>Hủy</span>
+              </button>
             </div>
           </div>
         )}
