@@ -134,7 +134,6 @@ export default function Home() {
   // ==========================================
   // 4️⃣ LOGIC NHẠC CHUÔNG GỌI ĐIỆN
   // ==========================================
-  // Thiết lập file nhạc khi tải trang
   useEffect(() => {
     ringtoneRef.current = new Audio(
       'https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg'
@@ -142,10 +141,23 @@ export default function Home() {
     ringtoneRef.current.loop = true;
   }, []);
 
-  // Bật/tắt nhạc khi có cuộc gọi tới
   useEffect(() => {
     if (incomingCall) {
       ringtoneRef.current?.play().catch((e) => console.log('Trình duyệt chặn AutoPlay', e));
+
+      // Đếm ngược 45s nếu không ai thưa máy
+      const timer = setTimeout(() => {
+        socketRef.current.emit('send_message', {
+          conversationId: incomingCall.roomId,
+          senderId: incomingCall.callerId, // Ép A làm người gửi để bong bóng đúng vị trí
+          text: 'missed',
+          messageType: 'call',
+          mediaUrl: '',
+        });
+        setIncomingCall(null);
+      }, 45000);
+
+      return () => clearTimeout(timer); // Hủy bộ đếm nếu nghe/từ chối trước 45s
     } else {
       if (ringtoneRef.current) {
         ringtoneRef.current.pause();
@@ -153,12 +165,6 @@ export default function Home() {
       }
     }
   }, [incomingCall]);
-
-  // Bộ đếm cập nhật thời gian
-  useEffect(() => {
-    const interval = setInterval(() => setTick((t) => t + 1), 60000);
-    return () => clearInterval(interval);
-  }, []);
 
   // ==========================================
   // 5️⃣ KẾT NỐI MÁY CHỦ (SOCKET.IO)
@@ -191,6 +197,14 @@ export default function Home() {
         return [...prev, newMsg];
       });
       fetchConversationsSafe(currentUser.id);
+
+      // 🔥 Tự động tắt bảng đổ chuông nếu người A hủy hoặc quá hạn cuộc gọi
+      if (
+        newMsg.messageType === 'call' &&
+        (newMsg.text === 'canceled' || newMsg.text === 'missed')
+      ) {
+        setIncomingCall((prev) => (prev && prev.roomId === newMsg.conversationId ? null : prev));
+      }
     });
 
     socketRef.current.on('messages_read', ({ conversationId }) => {
@@ -598,7 +612,16 @@ export default function Home() {
               </p>
               <div className='flex w-full justify-between gap-4 px-4'>
                 <button
-                  onClick={() => setIncomingCall(null)}
+                  onClick={() => {
+                    socketRef.current.emit('send_message', {
+                      conversationId: incomingCall.roomId,
+                      senderId: incomingCall.callerId, // Ép A làm người gửi
+                      text: 'rejected',
+                      messageType: 'call',
+                      mediaUrl: '',
+                    });
+                    setIncomingCall(null);
+                  }}
                   className='group flex flex-1 flex-col items-center gap-2'
                 >
                   <div className='flex h-14 w-14 items-center justify-center rounded-full bg-[#ff3b30] shadow-lg transition-transform group-hover:bg-[#ff1a1a] hover:scale-110'>
@@ -1261,6 +1284,72 @@ export default function Home() {
                                     />
                                   </div>
                                 )
+                              ) : msg.messageType === 'call' ? (
+                                /* 🔥 BƯỚC 4: GIAO DIỆN BONG BÓNG CUỘC GỌI CHUẨN APP 🔥 */
+                                (() => {
+                                  let icon = '📞';
+                                  let title = isMine ? 'Cuộc gọi đi' : 'Cuộc gọi đến';
+                                  let subtitle = msg.text;
+                                  let titleColor = '#e4e6eb';
+                                  let subtitleColor = '#b0b3b8';
+
+                                  if (msg.text === 'canceled') {
+                                    title = isMine ? 'Cuộc gọi đi' : 'Cuộc gọi nhỡ';
+                                    subtitle = isMine ? 'Bạn đã hủy' : 'Bị nhỡ';
+                                    if (!isMine) {
+                                      icon = '📵';
+                                      titleColor = '#ff3b30';
+                                      subtitleColor = '#ff3b30';
+                                    }
+                                  } else if (msg.text === 'rejected') {
+                                    title = isMine ? 'Cuộc gọi đi' : 'Cuộc gọi đến';
+                                    subtitle = 'Từ chối';
+                                    icon = '📵';
+                                    subtitleColor = '#ff3b30';
+                                    titleColor = '#ff3b30';
+                                  } else if (msg.text === 'missed') {
+                                    title = isMine ? 'Cuộc gọi đi' : 'Cuộc gọi nhỡ';
+                                    subtitle = isMine ? '0 phút 0 giây' : 'Bị nhỡ';
+                                    if (!isMine) {
+                                      icon = '📵';
+                                      titleColor = '#ff3b30';
+                                      subtitleColor = '#ff3b30';
+                                    }
+                                  }
+
+                                  return (
+                                    <div className='flex min-w-[200px] flex-col rounded-2xl border border-gray-700 bg-[#242526] p-3 shadow-sm select-none'>
+                                      <div className='mb-1.5 flex items-center gap-3'>
+                                        <div className='flex h-9 w-9 items-center justify-center rounded-full bg-[#3a3b3c]'>
+                                          <span className='text-[16px]'>{icon}</span>
+                                        </div>
+                                        <span
+                                          className='text-[15px] font-semibold'
+                                          style={{ color: titleColor }}
+                                        >
+                                          {title}
+                                        </span>
+                                      </div>
+                                      <span
+                                        className='mb-2 pl-12 text-[13px] font-medium'
+                                        style={{ color: subtitleColor }}
+                                      >
+                                        {subtitle}
+                                      </span>
+                                      <div className='pl-12'>
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleStartCall('voice');
+                                          }}
+                                          className='w-fit rounded-full bg-[#3a3b3c] px-4 py-1.5 text-[13px] font-semibold text-[#e4e6eb] transition hover:bg-[#4e4f50]'
+                                        >
+                                          Gọi lại
+                                        </button>
+                                      </div>
+                                    </div>
+                                  );
+                                })()
                               ) : isOnlyEmoji ? (
                                 <div className='pb-1 text-[44px] leading-none drop-shadow-md'>
                                   {msg.text}
