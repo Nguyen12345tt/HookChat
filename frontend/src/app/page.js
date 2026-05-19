@@ -46,20 +46,33 @@ export default function Home() {
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
   useEffect(() => {
-    try {
-      const token = localStorage.getItem('token');
-      const userStr = localStorage.getItem('user');
+    const checkAuth = () => {
+      try {
+        const token = localStorage.getItem('token');
+        const userStr = localStorage.getItem('user');
 
-      if (!token || !userStr) {
-        window.location.href = '/login';
-      } else {
+        if (!token || !userStr) {
+          // Trị Safari: Delay 100ms để nó không bị ngợp
+          setTimeout(() => {
+            window.location.href = '/login';
+          }, 100);
+          return;
+        }
+
         setCurrentUser(JSON.parse(userStr));
         setIsCheckingAuth(false);
+      } catch (error) {
+        console.log('Lỗi đọc dữ liệu trên iPhone:', error);
+        // Xóa sạch dữ liệu lỗi (nếu có)
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 100);
       }
-    } catch (error) {
-      console.log('Lỗi đọc dữ liệu trên iPhone:', error);
-      window.location.href = '/login';
-    }
+    };
+
+    checkAuth();
   }, []);
 
   // --- STATE DỮ LIỆU & GIAO DIỆN ---
@@ -528,8 +541,15 @@ export default function Home() {
 
   if (isCheckingAuth)
     return (
-      <div className='flex h-[100dvh] items-center justify-center bg-[#242526] text-[#b0b3b8]'>
-        <p className='animate-pulse'>Đang tải dữ liệu...</p>
+      <div className='flex h-[100dvh] flex-col items-center justify-center bg-[#242526] text-[#b0b3b8]'>
+        <p className='mb-4 animate-pulse'>Đang tải dữ liệu...</p>
+        {/* Nút bấm dự phòng nếu Safari không tự động chuyển trang */}
+        <button
+          onClick={() => (window.location.href = '/login')}
+          className='rounded-lg bg-[#0084ff] px-5 py-2 font-semibold text-white transition hover:bg-[#0073e6]'
+        >
+          Đăng nhập để tiếp tục
+        </button>
       </div>
     );
 
