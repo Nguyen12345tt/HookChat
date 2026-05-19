@@ -30,7 +30,7 @@ export default function CallPage({ params }) {
         }
         const currentUser = JSON.parse(userStr);
 
-        // 🛑 BÁC ĐIỀN ĐÚNG 2 THÔNG TIN CỦA BÁC VÀO ĐÂY LÀ XONG:
+        // Điền serverSecret và appID trong zegoCloud
         const appID = 2003933466; 
         const serverSecret = process.env.NEXT_PUBLIC_ZEGO_SECRET;
         
