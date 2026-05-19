@@ -540,7 +540,7 @@ export default function Home() {
   return (
     <div className='dark'>
       <div
-        className='relative flex h-[100dvh] overflow-hidden bg-[#242526] font-sans text-[#e4e6eb]'
+        className='relative flex h-[100dvh] w-full flex-col-reverse overflow-hidden bg-[#242526] font-sans text-[#e4e6eb] md:flex-row'
         onClick={() => {
           setOpenMenuId(null);
           setActiveReactionId(null);
@@ -550,8 +550,11 @@ export default function Home() {
         }}
       >
         {/* === 1. MENU TRÁI CÙNG === */}
-        <div className='relative z-20 hidden w-[68px] shrink-0 flex-col items-center justify-between border-r border-gray-700 bg-[#242526] py-4 md:flex'>
-          <div className='flex flex-col gap-4'>
+        {/* === 1. THANH ĐIỀU HƯỚNG (BOTTOM TRÊN MOBILE, LEFT TRÊN DESKTOP) === */}
+        <div
+          className={`relative z-20 w-full shrink-0 flex-row items-center justify-between border-t border-gray-700 bg-[#242526] px-6 py-2 md:w-[68px] md:flex-col md:border-t-0 md:border-r md:px-0 md:py-4 ${activeConversation ? 'hidden md:flex' : 'flex'}`}
+        >
+          <div className='flex flex-row gap-8 md:flex-col md:gap-4'>
             <button className='flex h-10 w-10 items-center justify-center rounded-full bg-gray-700 hover:bg-gray-600'>
               💬
             </button>
@@ -563,10 +566,10 @@ export default function Home() {
             </button>
           </div>
 
-          <div className='relative mt-auto flex flex-col items-center'>
+          <div className='relative ml-auto flex items-center md:mt-auto md:ml-0 md:flex-col'>
             {showSettingsMenu && (
               <div
-                className='absolute bottom-12 left-4 z-50 w-[280px] overflow-hidden rounded-xl border border-gray-700 bg-[#242526] py-2 shadow-[0_0_15px_rgba(0,0,0,0.5)]'
+                className='absolute right-0 bottom-14 z-50 w-[280px] overflow-hidden rounded-xl border border-gray-700 bg-[#242526] py-2 shadow-[0_0_15px_rgba(0,0,0,0.5)] md:right-auto md:bottom-12 md:left-4'
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className='flex cursor-pointer items-center justify-between px-4 py-2 text-[#e4e6eb] transition hover:bg-[#3a3b3c]'>
@@ -638,7 +641,7 @@ export default function Home() {
 
         {/* === 2. DANH SÁCH BẠN BÈ & NHÓM CHAT === */}
         <div
-          className={`relative z-10 w-full shrink-0 flex-col border-r border-gray-700 bg-[#242526] md:w-[360px] ${activeConversation ? 'hidden md:flex' : 'flex'}`}
+          className={`relative z-10 w-full flex-1 shrink-0 flex-col border-r border-gray-700 bg-[#242526] md:w-[360px] md:flex-none ${activeConversation ? 'hidden md:flex' : 'flex'}`}
         >
           <div className='border-b border-gray-700/50 p-4 pb-3'>
             <div className='mb-4 flex items-center justify-between'>
