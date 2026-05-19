@@ -638,18 +638,19 @@ export default function Home() {
                 Đang gọi {incomingCall.type === 'video' ? 'Video 🎥' : 'Thoại 📞'} cho bạn...
               </p>
               <div className='flex w-full justify-between gap-4 px-4'>
+                {/* 🔴 NÚT TỪ CHỐI (MÀU ĐỎ) */}
                 <button
                   onClick={() => {
-                    // 🔥 MÁY B BẮN TÍN HIỆU CHO MÁY A BIẾT LÀ ĐÃ ĐỒNG Ý
-                    socketRef.current.emit('accept_call', {
-                      roomId: incomingCall.roomId,
-                      participantIds: incomingCall.participantIds,
-                      type: incomingCall.type,
+                    // 1. Bắn tin nhắn báo từ chối vào chat (không chuyển trang)
+                    socketRef.current.emit('send_message', {
+                      conversationId: incomingCall.roomId,
+                      senderId: incomingCall.callerId, // Ép A làm người gửi để bong bóng đúng chiều
+                      text: 'rejected',
+                      messageType: 'call',
+                      mediaUrl: '',
                     });
-
-                    const callUrl = `/call/${incomingCall.roomId}?type=${incomingCall.type}`;
+                    // 2. Chỉ đóng bảng đổ chuông lại
                     setIncomingCall(null);
-                    window.location.href = callUrl;
                   }}
                   className='group flex flex-1 flex-col items-center gap-2'
                 >
@@ -658,8 +659,18 @@ export default function Home() {
                   </div>
                   <span className='text-sm font-medium text-gray-300'>Từ chối</span>
                 </button>
+
+                {/* 🟢 NÚT NGHE MÁY (MÀU XANH) */}
                 <button
                   onClick={() => {
+                    // 1. Máy B báo cho máy A biết là đã đồng ý
+                    socketRef.current.emit('accept_call', {
+                      roomId: incomingCall.roomId,
+                      participantIds: incomingCall.participantIds,
+                      type: incomingCall.type,
+                    });
+
+                    // 2. Máy B tự động chuyển sang trang gọi
                     const callUrl = `/call/${incomingCall.roomId}?type=${incomingCall.type}`;
                     setIncomingCall(null);
                     window.location.href = callUrl;
