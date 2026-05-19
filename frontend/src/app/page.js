@@ -117,14 +117,14 @@ export default function Home() {
     // Hàm gọi API lấy danh sách phòng chat cho cột trái
     const fetchConversationsSafe = async (userId) => {
       try {
-        const res = await axios.get(`http://localhost:5000/api/chat/conversations/user/${userId}`);
+        const res = await axios.get(`https://hookchat-e6ad.onrender.com/api/chat/conversations/user/${userId}`);
         setConversations(res.data);
       } catch (error) {
         console.log("Lỗi tải danh sách phòng chat", error);
       }
     };
 
-    socketRef.current = io("http://localhost:5000");
+    socketRef.current = io("https://hookchat-e6ad.onrender.com");
     socketRef.current.emit("user_connected", currentUser.id);
 
     socketRef.current.on("get_online_users", (users) => {
@@ -172,7 +172,7 @@ export default function Home() {
 
     const fetchUsers = async () => {
       try {
-        const res = await axios.get(`http://localhost:5000/api/chat/users/${currentUser.id}`);
+        const res = await axios.get(`https://hookchat-e6ad.onrender.com/api/chat/users/${currentUser.id}`);
         setUsers(res.data);
       } catch (error) {
         console.log("Lỗi lấy danh sách user:", error);
@@ -198,7 +198,7 @@ export default function Home() {
 
       socketRef.current.emit("join_conversation", conv._id);
 
-      const resMsgs = await axios.get(`http://localhost:5000/api/chat/messages/${conv._id}`);
+      const resMsgs = await axios.get(`https://hookchat-e6ad.onrender.com/api/chat/messages/${conv._id}`);
       setMessages(resMsgs.data);
 
       socketRef.current.emit("mark_as_read", { 
@@ -231,7 +231,7 @@ export default function Home() {
       
       if (selectedMembers.length === 1) {
         // TẠO HOẶC MỞ CHAT 1-1
-        const res = await axios.post("http://localhost:5000/api/chat/conversation/direct", {
+        const res = await axios.post("https://hookchat-e6ad.onrender.com/api/chat/conversation/direct", {
           senderId: currentUser.id,
           receiverId: selectedMembers[0]
         });
@@ -239,7 +239,7 @@ export default function Home() {
       } else {
         // TẠO GROUP CHAT
         if (!newGroupName.trim()) return alert("Vui lòng đặt tên cho nhóm!");
-        const res = await axios.post("http://localhost:5000/api/chat/conversation/group", {
+        const res = await axios.post("https://hookchat-e6ad.onrender.com/api/chat/conversation/group", {
           creatorId: currentUser.id,
           groupName: newGroupName,
           participantIds: selectedMembers
@@ -251,7 +251,7 @@ export default function Home() {
       handleSelectConversation(resConv);
 
       // Gọi API tải lại cột bên trái
-      const resRefresh = await axios.get(`http://localhost:5000/api/chat/conversations/user/${currentUser.id}`);
+      const resRefresh = await axios.get(`https://hookchat-e6ad.onrender.com/api/chat/conversations/user/${currentUser.id}`);
       setConversations(resRefresh.data);
 
       // Đóng Hộp thoại & Reset dữ liệu
@@ -350,7 +350,7 @@ const handleTyping = (e) => {
 
     setIsUpdatingAvatar(true);
     try {
-      const sigResponse = await axios.get('http://localhost:5000/api/chat/upload-signature');
+      const sigResponse = await axios.get('https://hookchat-e6ad.onrender.com/api/chat/upload-signature');
       const { signature, timestamp, cloud_name, api_key } = sigResponse.data;
 
       const formData = new FormData();
@@ -366,7 +366,7 @@ const handleTyping = (e) => {
       );
       const newAvatarUrl = uploadResponse.data.secure_url;
 
-      await axios.put(`http://localhost:5000/api/chat/users/${currentUser.id}/avatar`, {
+      await axios.put(`https://hookchat-e6ad.onrender.com/api/chat/users/${currentUser.id}/avatar`, {
         avatarUrl: newAvatarUrl
       });
 
@@ -395,7 +395,7 @@ const handleTyping = (e) => {
     }
 
     try {
-      const response = await axios.put(`http://localhost:5000/api/chat/users/${currentUser.id}/name`, {
+      const response = await axios.put(`https://hookchat-e6ad.onrender.com/api/chat/users/${currentUser.id}/name`, {
         name: newName.trim()
       });
 
@@ -419,7 +419,7 @@ const handleTyping = (e) => {
     setIsUploading(true);
 
     try {
-      const sigResponse = await axios.get('http://localhost:5000/api/chat/upload-signature');
+      const sigResponse = await axios.get('https://hookchat-e6ad.onrender.com/api/chat/upload-signature');
       const { signature, timestamp, cloud_name, api_key } = sigResponse.data;
 
       const formData = new FormData();
