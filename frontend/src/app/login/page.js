@@ -24,7 +24,7 @@ export default function Login() {
     try {
       if (isLoginMode) {
         // GỌI API ĐĂNG NHẬP
-        const res = await axios.post("http://localhost:5000/api/auth/login", {
+        const res = await axios.post("https://hookchat-e6ad.onrender.com/api/auth/login", {
           email,
           password,
         });
@@ -37,7 +37,7 @@ export default function Login() {
         router.push("/");
       } else {
         // GỌI API ĐĂNG KÝ
-        await axios.post("http://localhost:5000/api/auth/register", {
+        await axios.post("https://hookchat-e6ad.onrender.com/api/auth/register", {
           name,
           email,
           password,
