@@ -42,30 +42,34 @@ const DEFAULT_GROUP_AVATAR = 'https://cdn-icons-png.flaticon.com/512/166/166258.
 export default function Home() {
   const router = useRouter();
 
-  // --- 1. CHỐT BẢO VỆ & AUTH ---
   const [currentUser, setCurrentUser] = useState(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const userStr = localStorage.getItem('user');
+    try {
+      const token = localStorage.getItem('token');
+      const userStr = localStorage.getItem('user');
 
-    if (!token || !userStr) {
-      router.push('/login');
-    } else {
-      setCurrentUser(JSON.parse(userStr));
-      setIsCheckingAuth(false);
+      if (!token || !userStr) {
+        window.location.href = '/login';
+      } else {
+        setCurrentUser(JSON.parse(userStr));
+        setIsCheckingAuth(false);
+      }
+    } catch (error) {
+      console.log('Lỗi đọc dữ liệu trên iPhone:', error);
+      window.location.href = '/login';
     }
-  }, [router]);
+  }, []);
 
-  // --- 2. STATE DỮ LIỆU & GIAO DIỆN ---
+  // --- STATE DỮ LIỆU & GIAO DIỆN ---
   const [users, setUsers] = useState([]);
-  const [conversations, setConversations] = useState([]); // 🔥 Danh sách phòng chat cột trái
+  const [conversations, setConversations] = useState([]);
 
   const [activeConversation, setActiveConversation] = useState(null);
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
-  const [drafts, setDrafts] = useState({}); // 🔥 State lưu bản nháp của từng phòng chat
+  const [drafts, setDrafts] = useState({});
   const [isUploading, setIsUploading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
 
@@ -84,38 +88,62 @@ export default function Home() {
 
   const [showPinnedModal, setShowPinnedModal] = useState(false);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
-  const [incomingCall, setIncomingCall] = useState(null); // State lưu thông tin cuộc gọi tới
+
+  // State quản lý Cuộc gọi tới
+  const [incomingCall, setIncomingCall] = useState(null);
 
   const socketRef = useRef(null);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const inputRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+  const avatarInputRef = useRef(null);
+
+  // 🔥 KHAI BÁO BIẾN CHỨA NHẠC CHUÔNG
+  const ringtoneRef = useRef(null);
 
   // State quản lý Hộp thoại Thu hồi
   const [recallModalData, setRecallModalData] = useState(null);
   const [recallOption, setRecallOption] = useState('everyone');
 
-  // 🔥 Quản lý Modal Tạo Nhóm
+  // Quản lý Modal Tạo Nhóm
   const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
   const [selectedMembers, setSelectedMembers] = useState([]);
 
-  // State quản lý Avatar
-  const avatarInputRef = useRef(null);
   const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
 
-  // --- 3. ĐỒNG HỒ ĐẾM NHỊP ---
+  // --- 1. SETUP NHẠC CHUÔNG LÚC KHỞI ĐỘNG ---
+  useEffect(() => {
+    // Dùng tạm link âm thanh chuông kỹ thuật số
+    ringtoneRef.current = new Audio(
+      'https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg'
+    );
+    ringtoneRef.current.loop = true; // Lặp lại cho đến khi nghe máy
+  }, []);
+
+  // --- 2. BẬT/TẮT NHẠC TỰ ĐỘNG THEO TRẠNG THÁI CÓ CUỘC GỌI ---
+  useEffect(() => {
+    if (incomingCall) {
+      // Có cuộc gọi tới -> Phát nhạc
+      ringtoneRef.current?.play().catch((e) => console.log('Trình duyệt chặn AutoPlay', e));
+    } else {
+      // Bấm Nghe hoặc Từ chối -> Dừng nhạc
+      if (ringtoneRef.current) {
+        ringtoneRef.current.pause();
+        ringtoneRef.current.currentTime = 0;
+      }
+    }
+  }, [incomingCall]);
+
   useEffect(() => {
     const interval = setInterval(() => setTick((t) => t + 1), 60000);
     return () => clearInterval(interval);
   }, []);
 
-  // --- 4. KHỞI ĐỘNG HỆ THỐNG ---
   useEffect(() => {
     if (isCheckingAuth || !currentUser) return;
 
-    // Hàm gọi API lấy danh sách phòng chat cho cột trái
     const fetchConversationsSafe = async (userId) => {
       try {
         const res = await axios.get(
@@ -139,7 +167,7 @@ export default function Home() {
         if (prev.find((m) => m._id === newMsg._id)) return prev;
         return [...prev, newMsg];
       });
-      fetchConversationsSafe(currentUser.id); // Load lại cột trái cho mới
+      fetchConversationsSafe(currentUser.id);
     });
 
     socketRef.current.on('messages_read', ({ conversationId }) => {
@@ -175,9 +203,9 @@ export default function Home() {
       if (data.senderId !== currentUser.id) setIsTyping(false);
     });
 
-    // --- LẮNG NGHE CÓ NGƯỜI GỌI TỚI ---
+    // --- LẮNG NGHE SÓNG GỌI TỚI ---
     socketRef.current.on('incoming_call', (callData) => {
-      // Nếu ID của người nhận có chứa ID của mình thì mới reo chuông
+      // Đảm bảo mình nằm trong danh sách thành viên của phòng này (áp dụng cả 1-1 và nhóm)
       if (callData.participantIds.includes(currentUser.id)) {
         setIncomingCall(callData);
       }
@@ -189,13 +217,11 @@ export default function Home() {
           `https://hookchat-e6ad.onrender.com/api/chat/users/${currentUser.id}`
         );
         setUsers(res.data);
-      } catch (error) {
-        console.log('Lỗi lấy danh sách user:', error);
-      }
+      } catch (error) {}
     };
 
     fetchUsers();
-    fetchConversationsSafe(currentUser.id); // Kích hoạt lấy ds Phòng chat
+    fetchConversationsSafe(currentUser.id);
 
     return () => socketRef.current.disconnect();
   }, [isCheckingAuth, currentUser]);
@@ -204,13 +230,10 @@ export default function Home() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping]);
 
-  // --- 5. HÀM CHỌN PHÒNG CHAT (TỪ CỘT TRÁI) ---
   const handleSelectConversation = async (conv) => {
     try {
       setActiveConversation(conv);
-      // 🔥 Phục hồi bản nháp (nếu có), nếu không thì để trống ô input
       setInputText(drafts[conv._id] || '');
-
       socketRef.current.emit('join_conversation', conv._id);
 
       const resMsgs = await axios.get(
@@ -233,18 +256,16 @@ export default function Home() {
 
       setIsTyping(false);
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    } catch (error) {
-      console.log('Lỗi khi mở phòng chat:', error);
-    }
+    } catch (error) {}
   };
 
   const handleStartCall = (type) => {
     if (!activeConversation) return;
 
-    // Lấy danh sách ID của phòng để biết gọi cho ai
+    // Lấy ID của mọi người trong nhóm/phòng chat
     const participantIds = activeConversation.participants.map((p) => p._id || p);
 
-    // 1. Gửi tín hiệu Socket đổ chuông cho người kia
+    // Bắn tín hiệu Socket báo có người gọi
     socketRef.current.emit('initiate_call', {
       callerId: currentUser.id,
       callerName: currentUser.name,
@@ -254,68 +275,47 @@ export default function Home() {
       participantIds: participantIds,
     });
 
-    // 2. Chuyển người gọi (chính mình) vào phòng Zego chờ sẵn
+    // Chuyển luôn người gọi vào phòng Zego chờ
     router.push(`/call/${activeConversation._id}?type=${type}`);
   };
 
-  // 🔥 Hàm xử lý Gọi API tạo nhóm chat hoặc chat 1-1
   const handleCreateNewChat = async () => {
     if (selectedMembers.length === 0) return alert('Vui lòng chọn bạn bè!');
 
     try {
       let resConv;
-
       if (selectedMembers.length === 1) {
-        // TẠO HOẶC MỞ CHAT 1-1
         const res = await axios.post(
           'https://hookchat-e6ad.onrender.com/api/chat/conversation/direct',
-          {
-            senderId: currentUser.id,
-            receiverId: selectedMembers[0],
-          }
+          { senderId: currentUser.id, receiverId: selectedMembers[0] }
         );
         resConv = res.data;
       } else {
-        // TẠO GROUP CHAT
         if (!newGroupName.trim()) return alert('Vui lòng đặt tên cho nhóm!');
         const res = await axios.post(
           'https://hookchat-e6ad.onrender.com/api/chat/conversation/group',
-          {
-            creatorId: currentUser.id,
-            groupName: newGroupName,
-            participantIds: selectedMembers,
-          }
+          { creatorId: currentUser.id, groupName: newGroupName, participantIds: selectedMembers }
         );
         resConv = res.data;
       }
-
-      // Mở phòng chat vừa tạo
       handleSelectConversation(resConv);
-
-      // Gọi API tải lại cột bên trái
       const resRefresh = await axios.get(
         `https://hookchat-e6ad.onrender.com/api/chat/conversations/user/${currentUser.id}`
       );
       setConversations(resRefresh.data);
-
-      // Đóng Hộp thoại & Reset dữ liệu
       setShowCreateGroupModal(false);
       setNewGroupName('');
       setSelectedMembers([]);
     } catch (error) {
-      console.log('Lỗi tạo phòng:', error);
       alert('Khởi tạo thất bại, vui lòng thử lại!');
     }
   };
 
-  // --- 6. CÁC HÀM XỬ LÝ SỰ KIỆN GỬI TIN NHẮN ---
   const handleTyping = (e) => {
     const text = e.target.value;
-    setInputText(text); // Cập nhật ô input hiện tại
+    setInputText(text);
 
     if (!activeConversation) return;
-
-    // 🔥 Lưu ngay chữ đang gõ vào kho Bản nháp của phòng này
     setDrafts((prev) => ({ ...prev, [activeConversation._id]: text }));
 
     socketRef.current.emit('typing', {
@@ -324,7 +324,6 @@ export default function Home() {
     });
 
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-
     typingTimeoutRef.current = setTimeout(() => {
       socketRef.current.emit('stop_typing', {
         conversationId: activeConversation._id,
@@ -335,7 +334,6 @@ export default function Home() {
 
   const handleSendMessage = () => {
     if (!inputText.trim() || !activeConversation) return;
-
     const msgData = {
       conversationId: activeConversation._id,
       senderId: currentUser.id,
@@ -343,22 +341,17 @@ export default function Home() {
       messageType: 'text',
       mediaUrl: '',
     };
-
     socketRef.current.emit('send_message', msgData);
-    // 🔥 Xóa bản nháp của phòng này vì đã gửi đi rồi
     setDrafts((prev) => {
       const newDrafts = { ...prev };
       delete newDrafts[activeConversation._id];
       return newDrafts;
     });
-
     socketRef.current.emit('stop_typing', {
       conversationId: activeConversation._id,
       senderId: currentUser.id,
     });
-
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-
     setInputText('');
     setShowEmojiPicker(false);
     setReplyingTo(null);
@@ -367,14 +360,13 @@ export default function Home() {
 
   const handleSendLike = () => {
     if (!activeConversation) return;
-    const msgData = {
+    socketRef.current.emit('send_message', {
       conversationId: activeConversation._id,
       senderId: currentUser.id,
       text: '👍',
       messageType: 'text',
       mediaUrl: '',
-    };
-    socketRef.current.emit('send_message', msgData);
+    });
     setShowEmojiPicker(false);
   };
 
@@ -421,10 +413,8 @@ export default function Home() {
       const updatedUser = { ...currentUser, avatar: newAvatarUrl };
       setCurrentUser(updatedUser);
       localStorage.setItem('user', JSON.stringify(updatedUser));
-
       alert('Đổi ảnh đại diện thành công! 🎉');
     } catch (error) {
-      console.log('❌ LỖI ĐỔI AVATAR:', error);
       alert('Đổi ảnh thất bại, thử lại nhé!');
     } finally {
       setIsUpdatingAvatar(false);
@@ -435,13 +425,11 @@ export default function Home() {
 
   const handleChangeName = async () => {
     const newName = prompt('Nhập tên người dùng mới:', currentUser?.name);
-
     if (newName === null) return;
     if (!newName.trim() || newName.trim() === currentUser?.name) {
       alert('Vui lòng nhập tên mới!');
       return;
     }
-
     try {
       const response = await axios.put(
         `https://hookchat-e6ad.onrender.com/api/chat/users/${currentUser.id}/name`,
@@ -449,14 +437,11 @@ export default function Home() {
           name: newName.trim(),
         }
       );
-
       const updatedUser = { ...currentUser, name: response.data.name };
       setCurrentUser(updatedUser);
       localStorage.setItem('user', JSON.stringify(updatedUser));
-
       alert('Đổi tên người dùng thành công! 🎉');
     } catch (error) {
-      console.log('❌ LỖI ĐỔI TÊN NGƯỜI DÙNG:', error);
       alert('Đổi tên thất bại, vui lòng thử lại!');
     } finally {
       setShowSettingsMenu(false);
@@ -466,9 +451,7 @@ export default function Home() {
   const handleImageChange = async (e) => {
     const file = e.target.files[0];
     if (!file || !activeConversation) return;
-
     setIsUploading(true);
-
     try {
       const sigResponse = await axios.get(
         'https://hookchat-e6ad.onrender.com/api/chat/upload-signature'
@@ -486,20 +469,14 @@ export default function Home() {
         `https://api.cloudinary.com/v1_1/${cloud_name}/image/upload`,
         formData
       );
-
-      const imageUrl = uploadResponse.data.secure_url;
-
-      const msgData = {
+      socketRef.current.emit('send_message', {
         conversationId: activeConversation._id,
         senderId: currentUser.id,
         text: 'Đã gửi một ảnh',
         messageType: 'image',
-        mediaUrl: imageUrl,
-      };
-
-      socketRef.current.emit('send_message', msgData);
+        mediaUrl: uploadResponse.data.secure_url,
+      });
     } catch (error) {
-      console.log('❌ LỖI UPLOAD TRỰC TIẾP:', error.response?.data || error);
       alert('Up ảnh thất bại, check tab Console nhé!');
     } finally {
       setIsUploading(false);
@@ -509,14 +486,13 @@ export default function Home() {
 
   const handleSendSticker = (stickerUrl) => {
     if (!activeConversation) return;
-    const msgData = {
+    socketRef.current.emit('send_message', {
       conversationId: activeConversation._id,
       senderId: currentUser.id,
       text: 'Đã gửi một nhãn dán',
       messageType: 'image',
       mediaUrl: stickerUrl,
-    };
-    socketRef.current.emit('send_message', msgData);
+    });
     setShowStickerPicker(false);
   };
 
@@ -550,7 +526,12 @@ export default function Home() {
     return null;
   };
 
-  if (isCheckingAuth) return <div className='h-screen bg-[#242526]'></div>;
+  if (isCheckingAuth)
+    return (
+      <div className='flex h-[100dvh] items-center justify-center bg-[#242526] text-[#b0b3b8]'>
+        <p className='animate-pulse'>Đang tải dữ liệu...</p>
+      </div>
+    );
 
   const pinnedMessages = messages.filter((m) => m.isPinned);
   const latestPinnedMsg =
@@ -559,7 +540,7 @@ export default function Home() {
   return (
     <div className='dark'>
       <div
-        className='relative flex h-screen overflow-hidden bg-[#242526] font-sans text-[#e4e6eb]'
+        className='relative flex h-[100dvh] overflow-hidden bg-[#242526] font-sans text-[#e4e6eb]'
         onClick={() => {
           setOpenMenuId(null);
           setActiveReactionId(null);
@@ -645,7 +626,6 @@ export default function Home() {
                 setShowSettingsMenu(!showSettingsMenu);
               }}
               className='h-10 w-10 cursor-pointer overflow-hidden rounded-full bg-blue-500 ring-2 ring-transparent transition hover:opacity-80'
-              title='Tùy chọn'
             >
               <img
                 src={currentUser?.avatar || DEFAULT_AVATAR}
@@ -656,7 +636,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* === 2. DANH SÁCH BẠN BÈ & NHÓM CHAT (CỘT BÊN TRÁI) === */}
+        {/* === 2. DANH SÁCH BẠN BÈ & NHÓM CHAT === */}
         <div
           className={`relative z-10 w-full shrink-0 flex-col border-r border-gray-700 bg-[#242526] md:w-[360px] ${activeConversation ? 'hidden md:flex' : 'flex'}`}
         >
@@ -666,7 +646,6 @@ export default function Home() {
               <button
                 onClick={() => setShowCreateGroupModal(true)}
                 className='flex h-9 w-9 items-center justify-center rounded-full bg-[#3a3b3c] text-[15px] transition hover:bg-[#4e4f50]'
-                title='Tạo nhóm mới'
               >
                 ✏️
               </button>
@@ -677,6 +656,7 @@ export default function Home() {
               className='w-full rounded-full bg-[#3a3b3c] p-2 px-4 text-sm outline-none'
             />
           </div>
+
           <div className='flex-1 overflow-y-auto'>
             {conversations.length === 0 && (
               <p className='mt-4 text-center text-sm text-gray-500'>
@@ -690,13 +670,12 @@ export default function Home() {
               let avatar = DEFAULT_AVATAR;
               let isOnline = false;
 
-              // Trích xuất an toàn dữ liệu Người kia hoặc Nhóm
               if (isGroup) {
                 name = conv.groupName || 'Nhóm không tên';
                 avatar = conv.groupAvatar || DEFAULT_GROUP_AVATAR;
               } else {
                 let partner = conv.participants?.find((p) => (p._id || p) !== currentUser.id);
-                if (!partner) partner = conv.participants?.[0]; // Lỡ chat với chính mình
+                if (!partner) partner = conv.participants?.[0];
 
                 if (partner) {
                   name = partner.name || 'Người dùng';
@@ -721,59 +700,46 @@ export default function Home() {
                   </div>
                   <div className='ml-3 flex-1 overflow-hidden'>
                     <h3 className='truncate text-[15px] font-semibold'>{name}</h3>
-
-                    {/* BẮT ĐẦU ĐOẠN XỬ LÝ TEXT PREVIEW XỊN SÒ */}
                     {(() => {
-                      // 🔥 1. KIỂM TRA XEM CÓ BẢN NHÁP KHÔNG TRƯỚC TIÊN
                       const draftText = drafts[conv._id];
-                      if (draftText && draftText.trim() !== '') {
+                      if (draftText && draftText.trim() !== '')
                         return (
                           <p className='truncate text-[13px] font-medium text-[#ff3040]'>
                             Bản nháp: {draftText}
                           </p>
                         );
-                      }
 
-                      // 2. NẾU KHÔNG CÓ BẢN NHÁP THÌ MỚI HIỆN TIN NHẮN CUỐI
                       let messagePreview = 'Nhấn để chat ngay';
-
                       if (conv.latestMessage) {
                         const isMine =
                           conv.latestMessage.senderId?._id === currentUser.id ||
                           conv.latestMessage.senderId === currentUser.id;
-
                         const realSenderId =
                           conv.latestMessage.senderId?._id || conv.latestMessage.senderId;
                         const senderObj = conv.participants?.find((p) => p._id === realSenderId);
-
                         const senderNameParts = senderObj?.name?.split(' ') || [];
                         const shortName = senderNameParts[senderNameParts.length - 1] || 'Ai đó';
-
                         const prefix = isMine ? 'Bạn' : shortName;
 
                         let content = '';
-                        if (conv.latestMessage.isRecalled) {
-                          content = 'Đã thu hồi một tin nhắn';
-                        } else if (conv.latestMessage.messageType === 'image') {
+                        if (conv.latestMessage.isRecalled) content = 'Đã thu hồi một tin nhắn';
+                        else if (conv.latestMessage.messageType === 'image')
                           content = conv.latestMessage.mediaUrl?.includes('sticker')
                             ? 'đã gửi nhãn dán'
                             : 'đã gửi một ảnh';
-                        } else {
-                          content = conv.latestMessage.text;
-                        }
+                        else content = conv.latestMessage.text;
 
-                        if (conv.isGroup) {
-                          messagePreview = `${prefix}: ${content}`;
-                        } else {
-                          messagePreview = isMine ? `Bạn: ${content}` : content;
-                        }
+                        messagePreview = conv.isGroup
+                          ? `${prefix}: ${content}`
+                          : isMine
+                            ? `Bạn: ${content}`
+                            : content;
                       }
 
                       const isUnread =
                         conv.latestMessage?.isRead === false &&
                         conv.latestMessage?.senderId?._id !== currentUser.id &&
                         conv.latestMessage?.senderId !== currentUser.id;
-
                       return (
                         <p
                           className={`truncate text-[13px] ${isUnread ? 'font-bold text-[#e4e6eb]' : 'text-[#b0b3b8]'}`}
@@ -782,7 +748,6 @@ export default function Home() {
                         </p>
                       );
                     })()}
-                    {/* KẾT THÚC ĐOẠN XỬ LÝ TEXT PREVIEW */}
                   </div>
                 </div>
               );
@@ -794,14 +759,57 @@ export default function Home() {
         <div
           className={`relative flex w-full min-w-0 flex-1 flex-col bg-[#242526] ${!activeConversation ? 'hidden md:flex' : 'flex'}`}
         >
-          {/* 🔥 MODAL: TẠO TIN NHẮN / TẠO NHÓM MỚI */}
+          {/* 🔥 MODAL ĐỔ CHUÔNG (ĐÃ ĐƯỢC CHUYỂN RA NGOÀI CÙNG ĐỂ KHÔNG BỊ LỖI HIỂN THỊ) 🔥 */}
+          {incomingCall && (
+            <div className='absolute inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm transition-opacity'>
+              <div className='animate-in zoom-in-95 flex w-[340px] flex-col items-center rounded-2xl border border-gray-700 bg-[#242526] p-8 shadow-[0_0_40px_rgba(0,132,255,0.3)]'>
+                {/* Hiệu ứng sóng tỏa ra (Radar) */}
+                <div className='relative mb-4 h-24 w-24'>
+                  <div className='absolute inset-0 animate-ping rounded-full bg-[#0084ff] opacity-30'></div>
+                  <img
+                    src={incomingCall.callerAvatar}
+                    alt='Caller'
+                    className='relative z-10 h-full w-full rounded-full border-4 border-[#242526] object-cover shadow-lg'
+                  />
+                </div>
+                <h2 className='mb-1 text-2xl font-bold text-white'>{incomingCall.callerName}</h2>
+                <p className='mb-8 text-[#b0b3b8]'>
+                  Đang gọi {incomingCall.type === 'video' ? 'Video 🎥' : 'Thoại 📞'} cho bạn...
+                </p>
+                <div className='flex w-full justify-between gap-4 px-4'>
+                  <button
+                    onClick={() => setIncomingCall(null)}
+                    className='group flex flex-1 flex-col items-center gap-2'
+                  >
+                    <div className='flex h-14 w-14 items-center justify-center rounded-full bg-[#ff3b30] shadow-lg transition-transform group-hover:bg-[#ff1a1a] hover:scale-110'>
+                      <span className='rotate-[135deg] text-2xl text-white'>📞</span>
+                    </div>
+                    <span className='text-sm font-medium text-gray-300'>Từ chối</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      router.push(`/call/${incomingCall.roomId}?type=${incomingCall.type}`);
+                      setIncomingCall(null);
+                    }}
+                    className='group flex flex-1 flex-col items-center gap-2'
+                  >
+                    <div className='flex h-14 w-14 animate-bounce items-center justify-center rounded-full bg-[#34c759] shadow-lg transition-transform group-hover:bg-[#30d158] hover:scale-110'>
+                      <span className='text-2xl text-white'>📞</span>
+                    </div>
+                    <span className='text-sm font-medium text-gray-300'>Nghe máy</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* CÁC MODAL KHÁC (TẠO NHÓM, GHIM, THU HỒI...) */}
           {showCreateGroupModal && (
             <div className='absolute inset-0 z-[100] flex items-center justify-center bg-black/60 transition-opacity'>
               <div
                 className='animate-in zoom-in-95 flex w-[420px] flex-col overflow-hidden rounded-xl border border-gray-700 bg-[#242526] shadow-2xl'
                 onClick={(e) => e.stopPropagation()}
               >
-                {/* Header Modal */}
                 <div className='relative flex items-center justify-between border-b border-gray-700 p-4'>
                   <h2 className='w-full text-center text-[20px] font-bold text-[#e4e6eb]'>
                     Tạo tin nhắn mới
@@ -813,8 +821,6 @@ export default function Home() {
                     ✕
                   </button>
                 </div>
-
-                {/* Nội dung: Nhập tên nhóm & Chọn bạn bè */}
                 <div className='flex flex-col gap-4 p-4'>
                   {selectedMembers.length >= 2 && (
                     <input
@@ -825,7 +831,6 @@ export default function Home() {
                       className='w-full rounded-lg bg-[#3a3b3c] p-3 text-[15px] text-[#e4e6eb] outline-none'
                     />
                   )}
-
                   <div>
                     <h3 className='mt-2 mb-2 text-[14px] font-semibold text-[#b0b3b8]'>
                       Chọn bạn bè để bắt đầu
@@ -841,11 +846,10 @@ export default function Home() {
                             className='h-5 w-5 cursor-pointer rounded-sm accent-[#0084ff]'
                             checked={selectedMembers.includes(user._id)}
                             onChange={(e) => {
-                              if (e.target.checked) {
+                              if (e.target.checked)
                                 setSelectedMembers((prev) => [...prev, user._id]);
-                              } else {
+                              else
                                 setSelectedMembers((prev) => prev.filter((id) => id !== user._id));
-                              }
                             }}
                           />
                           <div className='h-10 w-10 shrink-0 overflow-hidden rounded-full bg-gray-600'>
@@ -857,8 +861,6 @@ export default function Home() {
                     </div>
                   </div>
                 </div>
-
-                {/* Nút bấm */}
                 <div className='flex justify-end gap-2 border-t border-gray-700 bg-[#242526] p-4'>
                   <button
                     onClick={() => setShowCreateGroupModal(false)}
@@ -868,8 +870,8 @@ export default function Home() {
                   </button>
                   <button
                     onClick={handleCreateNewChat}
-                    className='rounded-lg bg-[#0084ff] px-6 py-2 font-semibold text-white transition hover:bg-[#0073e6] disabled:cursor-not-allowed disabled:opacity-50'
                     disabled={selectedMembers.length === 0}
+                    className='rounded-lg bg-[#0084ff] px-6 py-2 font-semibold text-white transition hover:bg-[#0073e6] disabled:cursor-not-allowed disabled:opacity-50'
                   >
                     {selectedMembers.length > 1 ? 'Tạo Nhóm' : 'Chat'}
                   </button>
@@ -878,7 +880,6 @@ export default function Home() {
             </div>
           )}
 
-          {/* BẢNG HIỂN THỊ "DANH SÁCH TIN NHẮN ĐÃ GHIM" (MODAL) */}
           {showPinnedModal && (
             <div className='absolute inset-0 z-50 flex items-center justify-center bg-black/60 transition-opacity'>
               <div
@@ -905,11 +906,11 @@ export default function Home() {
                     pinnedMessages.map((msg, idx) => (
                       <div
                         key={idx}
-                        className='group relative flex cursor-pointer items-center gap-3 rounded-xl p-3 transition hover:bg-[#3a3b3c]/50'
                         onClick={() => {
                           handleScrollToMessage(msg._id);
                           setShowPinnedModal(false);
                         }}
+                        className='group relative flex cursor-pointer items-center gap-3 rounded-xl p-3 transition hover:bg-[#3a3b3c]/50'
                       >
                         <div className='h-11 w-11 shrink-0 overflow-hidden rounded-full bg-gray-600'>
                           <img src={msg.senderId?.avatar || DEFAULT_AVATAR} alt='Avatar' />
@@ -939,7 +940,6 @@ export default function Home() {
             </div>
           )}
 
-          {/* HỘP THOẠI XÁC NHẬN GỠ/THU HỒI TIN NHẮN */}
           {recallModalData && (
             <div className='absolute inset-0 z-[100] flex items-center justify-center bg-black/60 transition-opacity'>
               <div
@@ -957,96 +957,35 @@ export default function Home() {
                     ✕
                   </button>
                 </div>
-
-                {/* 🔥 MODAL ĐỔ CHUÔNG KHI CÓ CUỘC GỌI TỚI 🔥 */}
-                {incomingCall && (
-                  <div className='absolute inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm transition-opacity'>
-                    <div className='animate-in zoom-in-95 flex w-[340px] flex-col items-center rounded-2xl border border-gray-700 bg-[#242526] p-8 shadow-[0_0_40px_rgba(0,132,255,0.3)]'>
-                      {/* Hiệu ứng sóng tỏa ra (Radar) */}
-                      <div className='relative mb-4 h-24 w-24'>
-                        <div className='absolute inset-0 animate-ping rounded-full bg-[#0084ff] opacity-30'></div>
-                        <img
-                          src={incomingCall.callerAvatar}
-                          alt='Caller'
-                          className='relative z-10 h-full w-full rounded-full border-4 border-[#242526] object-cover shadow-lg'
-                        />
-                      </div>
-
-                      <h2 className='mb-1 text-2xl font-bold text-white'>
-                        {incomingCall.callerName}
-                      </h2>
-                      <p className='mb-8 text-[#b0b3b8]'>
-                        Đang gọi {incomingCall.type === 'video' ? 'Video 🎥' : 'Thoại 📞'} cho
-                        bạn...
-                      </p>
-
-                      <div className='flex w-full justify-between gap-4 px-4'>
-                        {/* Nút Từ chối */}
-                        <button
-                          onClick={() => setIncomingCall(null)}
-                          className='group flex flex-1 flex-col items-center gap-2'
-                        >
-                          <div className='flex h-14 w-14 items-center justify-center rounded-full bg-[#ff3b30] shadow-lg transition-transform group-hover:bg-[#ff1a1a] hover:scale-110'>
-                            <span className='rotate-[135deg] text-2xl text-white'>📞</span>
-                          </div>
-                          <span className='text-sm font-medium text-gray-300'>Từ chối</span>
-                        </button>
-
-                        {/* Nút Nghe máy */}
-                        <button
-                          onClick={() => {
-                            router.push(`/call/${incomingCall.roomId}?type=${incomingCall.type}`);
-                            setIncomingCall(null);
-                          }}
-                          className='group flex flex-1 flex-col items-center gap-2'
-                        >
-                          <div className='flex h-14 w-14 animate-bounce items-center justify-center rounded-full bg-[#34c759] shadow-lg transition-transform group-hover:bg-[#30d158] hover:scale-110'>
-                            <span className='text-2xl text-white'>📞</span>
-                          </div>
-                          <span className='text-sm font-medium text-gray-300'>Nghe máy</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
                 <div className='flex flex-col gap-5 p-4'>
                   {(recallModalData.senderId?._id === currentUser.id ||
                     recallModalData.senderId === currentUser.id) && (
                     <label className='group flex cursor-pointer items-start gap-3'>
                       <input
                         type='radio'
-                        name='recallOption'
                         value='everyone'
                         checked={recallOption === 'everyone'}
                         onChange={() => setRecallOption('everyone')}
                         className='mt-1.5 h-5 w-5 shrink-0 cursor-pointer accent-[#0084ff]'
                       />
-                      <div className='flex flex-col'>
-                        <span className='text-[15px] font-semibold text-[#e4e6eb]'>
-                          Thu hồi với mọi người
-                        </span>
-                      </div>
+                      <span className='text-[15px] font-semibold text-[#e4e6eb]'>
+                        Thu hồi với mọi người
+                      </span>
                     </label>
                   )}
-
                   <label className='group flex cursor-pointer items-start gap-3'>
                     <input
                       type='radio'
-                      name='recallOption'
                       value='only_me'
                       checked={recallOption === 'only_me'}
                       onChange={() => setRecallOption('only_me')}
                       className='mt-1.5 h-5 w-5 shrink-0 cursor-pointer accent-[#0084ff]'
                     />
-                    <div className='flex flex-col'>
-                      <span className='text-[15px] font-semibold text-[#e4e6eb]'>
-                        Thu hồi với bạn
-                      </span>
-                    </div>
+                    <span className='text-[15px] font-semibold text-[#e4e6eb]'>
+                      Thu hồi với bạn
+                    </span>
                   </label>
                 </div>
-
                 <div className='mt-2 flex justify-end gap-2 p-4'>
                   <button
                     onClick={() => setRecallModalData(null)}
@@ -1056,11 +995,8 @@ export default function Home() {
                   </button>
                   <button
                     onClick={() => {
-                      if (recallOption === 'everyone') {
-                        handleRecallMessage(recallModalData._id);
-                      } else {
-                        setMessages((prev) => prev.filter((m) => m._id !== recallModalData._id));
-                      }
+                      if (recallOption === 'everyone') handleRecallMessage(recallModalData._id);
+                      else setMessages((prev) => prev.filter((m) => m._id !== recallModalData._id));
                       setRecallModalData(null);
                     }}
                     className='rounded-lg bg-[#0084ff] px-6 py-2 font-semibold text-white transition hover:bg-[#0073e6]'
@@ -1074,7 +1010,6 @@ export default function Home() {
 
           {activeConversation ? (
             <>
-              {/* Header Phòng chat */}
               {(() => {
                 let headerName = 'Đang tải...';
                 let headerAvatar = DEFAULT_AVATAR;
@@ -1091,7 +1026,6 @@ export default function Home() {
                       (p) => (p._id || p) !== currentUser.id
                     );
                     if (!partner) partner = activeConversation.participants?.[0];
-
                     if (partner) {
                       headerName = partner.name || 'Người dùng';
                       headerAvatar = partner.avatar || DEFAULT_AVATAR;
@@ -1107,16 +1041,13 @@ export default function Home() {
 
                 return (
                   <div className='z-10 flex h-[68px] shrink-0 items-center justify-between border-b border-gray-700 bg-[#242526] px-4 shadow-sm'>
-                    {/* Thông tin người/nhóm đang chat */}
                     <div className='flex items-center'>
-                      {/* NÚT BACK CHỈ HIỆN TRÊN MOBILE Ở ĐÂY BÁC NHÉ */}
                       <button
                         onClick={() => setActiveConversation(null)}
                         className='mr-2 flex h-8 w-8 items-center justify-center rounded-full text-xl text-[#b0b3b8] transition hover:bg-[#3a3b3c] md:hidden'
                       >
                         ❮
                       </button>
-
                       <div className='relative h-10 w-10 shrink-0'>
                         <img
                           src={headerAvatar}
@@ -1132,20 +1063,16 @@ export default function Home() {
                         <p className='text-[12px] text-[#b0b3b8]'>{headerSubText}</p>
                       </div>
                     </div>
-
-                    {/* 🔥 2 NÚT GỌI THOẠI & GỌI VIDEO Ở ĐÂY */}
                     <div className='flex items-center gap-2 text-[#0084ff]'>
                       <button
                         onClick={() => handleStartCall('voice')}
                         className='flex h-9 w-9 items-center justify-center rounded-full text-[18px] transition hover:bg-[#3a3b3c]'
-                        title='Bắt đầu gọi thoại'
                       >
                         📞
                       </button>
                       <button
                         onClick={() => handleStartCall('video')}
                         className='flex h-9 w-9 items-center justify-center rounded-full text-[18px] transition hover:bg-[#3a3b3c]'
-                        title='Bắt đầu gọi video'
                       >
                         🎥
                       </button>
@@ -1157,7 +1084,6 @@ export default function Home() {
                 );
               })()}
 
-              {/* THANH "TIN NHẮN ĐÃ GHIM" */}
               {pinnedMessages.length > 0 && (
                 <div
                   onClick={() => setShowPinnedModal(true)}
@@ -1186,7 +1112,6 @@ export default function Home() {
                 </div>
               )}
 
-              {/* Lịch sử Tin nhắn */}
               <div className='flex-1 space-y-1.5 overflow-y-auto p-4'>
                 {messages.map((msg, index) => {
                   const isMine =
@@ -1201,10 +1126,8 @@ export default function Home() {
                       activeReactionId === msg._id || openMenuId === msg._id
                         ? 'opacity-100'
                         : 'opacity-0 group-hover:opacity-100';
-
                     const popupPlacementClass =
                       popupPosition === 'up' ? 'bottom-full mb-1' : 'top-full mt-1';
-
                     return (
                       <div
                         className={`flex items-center gap-1 text-[#b0b3b8] transition-opacity ${isMine ? 'mr-2' : 'ml-2'} ${visibilityClass}`}
@@ -1224,7 +1147,6 @@ export default function Home() {
                           >
                             🙂
                           </button>
-
                           {activeReactionId === msg._id && (
                             <div
                               className={`absolute ${isMine ? 'right-0' : 'left-0'} ${popupPlacementClass} z-50 flex items-center gap-1 rounded-full border border-gray-700 bg-[#242526] px-2 py-1 shadow-[0_0_15px_rgba(0,0,0,0.5)]`}
@@ -1250,14 +1172,12 @@ export default function Home() {
                             </div>
                           )}
                         </div>
-
                         <button
                           onClick={() => setReplyingTo(msg)}
                           className='flex h-8 w-8 items-center justify-center rounded-full text-[18px] transition hover:bg-[#3a3b3c] hover:text-[#e4e6eb]'
                         >
                           ↩️
                         </button>
-
                         <div className='relative flex items-center'>
                           <button
                             onClick={(e) => {
@@ -1273,7 +1193,6 @@ export default function Home() {
                           >
                             ⋮
                           </button>
-
                           {openMenuId === msg._id && (
                             <div
                               className={`absolute ${isMine ? 'right-0' : 'left-0'} ${popupPlacementClass} z-50 w-[160px] overflow-hidden rounded-xl border border-gray-700 bg-[#242526] py-1.5 shadow-[0_0_15px_rgba(0,0,0,0.5)]`}
@@ -1322,13 +1241,11 @@ export default function Home() {
                           Đã ghim
                         </div>
                       )}
-
                       {activeConversation.isGroup && !isMine && (
                         <span className='mb-0.5 ml-10 text-[11px] text-[#b0b3b8]'>
                           {msg.senderId?.name}
                         </span>
                       )}
-
                       <div
                         className={`flex ${isMine ? 'justify-end' : 'items-end justify-start'} group relative w-full`}
                       >
@@ -1337,9 +1254,7 @@ export default function Home() {
                             <img src={msg.senderId?.avatar || DEFAULT_AVATAR} alt='Avatar' />
                           </div>
                         )}
-
                         {isMine && !msg.isRecalled && <HoverActions />}
-
                         <div className='relative'>
                           {msg.isPinned && (
                             <div className='absolute -top-2 -left-2 z-10 flex h-[20px] w-[20px] items-center justify-center rounded-full bg-[#e41e3f] shadow-sm ring-2 ring-[#242526]'>
@@ -1348,7 +1263,6 @@ export default function Home() {
                               </svg>
                             </div>
                           )}
-
                           {msg.isRecalled ? (
                             <div className='max-w-md rounded-[18px] border border-gray-600 bg-transparent px-4 py-2 text-[15px] text-[#b0b3b8] italic select-none'>
                               Tin nhắn đã thu hồi
@@ -1385,7 +1299,6 @@ export default function Home() {
                               )}
                             </>
                           )}
-
                           {msg.reactions && msg.reactions.length > 0 && !msg.isRecalled && (
                             <div
                               className={`absolute -bottom-2 ${isMine ? 'right-0' : 'left-0'} z-10 flex origin-bottom scale-90 items-center rounded-full border border-gray-700 bg-[#242526] px-1.5 py-[1px] shadow-md`}
@@ -1403,14 +1316,11 @@ export default function Home() {
                             </div>
                           )}
                         </div>
-
                         {!isMine && !msg.isRecalled && <HoverActions />}
                       </div>
-
                       {isMine && isLastMessage && msg.isRead && (
                         <div className='animate-in slide-in-from-top-1 fade-in mt-1 mr-2 flex justify-end duration-300'>
                           <div className='h-3.5 w-3.5 overflow-hidden rounded-full bg-gray-600 shadow-sm ring-[1.5px] ring-[#242526]'>
-                            {/* Trích xuất avatar người đã xem an toàn */}
                             {(() => {
                               let seenAvatar = DEFAULT_AVATAR;
                               if (activeConversation && !activeConversation.isGroup) {
@@ -1434,7 +1344,6 @@ export default function Home() {
                     </div>
                   );
                 })}
-
                 {isUploading && (
                   <div className='mt-2 flex justify-end'>
                     <div className='animate-pulse rounded-xl bg-[#3a3b3c] px-3 py-2 text-xs'>
@@ -1442,7 +1351,6 @@ export default function Home() {
                     </div>
                   </div>
                 )}
-
                 {isTyping && (
                   <div className='animate-in fade-in z-10 mt-2 mb-2 ml-1 flex items-center gap-2 duration-300'>
                     <div className='flex h-[36px] w-fit items-center gap-1.5 rounded-2xl rounded-bl-sm bg-[#3a3b3c] px-3 py-2'>
@@ -1461,11 +1369,9 @@ export default function Home() {
                     </div>
                   </div>
                 )}
-
                 <div ref={messagesEndRef} />
               </div>
 
-              {/* KHU VỰC NHẬP TIN NHẮN */}
               <div className='flex flex-col border-t border-transparent bg-[#242526]'>
                 {replyingTo && (
                   <div className='animate-in slide-in-from-bottom-2 flex items-center justify-between border-t border-gray-700/50 bg-[#242526] px-4 py-2'>
@@ -1488,7 +1394,6 @@ export default function Home() {
                     </button>
                   </div>
                 )}
-
                 <div
                   className='relative flex w-full shrink-0 items-center gap-1.5 p-2 px-2 sm:gap-2 sm:p-3 sm:px-4'
                   onClick={(e) => e.stopPropagation()}
@@ -1496,7 +1401,6 @@ export default function Home() {
                   <button className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-2xl text-[#0084ff] transition hover:bg-[#3a3b3c]'>
                     ⊕
                   </button>
-
                   <input
                     type='file'
                     ref={fileInputRef}
@@ -1510,7 +1414,6 @@ export default function Home() {
                   >
                     🖼️
                   </button>
-
                   <button
                     onClick={() => {
                       setShowStickerPicker(!showStickerPicker);
@@ -1522,7 +1425,6 @@ export default function Home() {
                   >
                     🧸
                   </button>
-
                   <div className='relative flex flex-1 items-center rounded-full bg-[#3a3b3c] pr-1 pl-3'>
                     <input
                       ref={inputRef}
@@ -1533,7 +1435,6 @@ export default function Home() {
                       placeholder='Aa'
                       className='min-w-0 flex-1 bg-transparent py-2.5 text-[15px] outline-none'
                     />
-
                     <button
                       onClick={() => {
                         setShowEmojiPicker(!showEmojiPicker);
@@ -1545,7 +1446,6 @@ export default function Home() {
                       {defaultEmojiToInput}
                     </button>
                   </div>
-
                   <button
                     onClick={inputText.trim() ? handleSendMessage : handleSendLike}
                     className='flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xl font-bold text-[#0084ff] transition hover:bg-[#3a3b3c]'
@@ -1566,7 +1466,6 @@ export default function Home() {
                           </button>
                         ))}
                       </div>
-
                       <div className='grid flex-1 grid-cols-4 gap-2 overflow-y-auto p-3'>
                         {STICKER_PACKS.find((p) => p.id === activeStickerTab)?.stickers.map(
                           (url, idx) => (
@@ -1587,7 +1486,6 @@ export default function Home() {
                       </div>
                     </div>
                   )}
-
                   {showEmojiPicker && (
                     <div className='absolute right-12 bottom-16 z-50 shadow-2xl'>
                       <EmojiPicker
