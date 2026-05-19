@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef, use } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { io } from 'socket.io-client'; // 🔥 THÊM IMPORT SOCKET VÀO ĐÂY
 
 export default function CallPage({ params }) {
   const containerRef = useRef(null);
@@ -48,19 +49,51 @@ export default function CallPage({ params }) {
 
         zegoInstanceRef.current = zp;
 
+        // 🔥 BẮT ĐẦU BẤM GIỜ NGAY KHI VÀO PHÒNG
+        const startTime = Date.now();
+
         zp.joinRoom({
           container: containerRef.current,
           scenario: { mode: ZegoUIKitPrebuilt.OneONoneCall },
           turnOnCameraWhenJoining: isVideoCall,
           showPreJoinView: false,
           onLeaveRoom: () => {
+            // 1. TÍNH TOÁN THỜI GIAN GỌI
+            const durationInSeconds = Math.floor((Date.now() - startTime) / 1000);
+            let textLog = '';
+
+            // Nếu thoát quá nhanh (< 2s) => Hủy cuộc gọi. Nếu không thì tính phút/giây.
+            if (durationInSeconds < 2) {
+              textLog = 'canceled';
+            } else {
+              const minutes = Math.floor(durationInSeconds / 60);
+              const seconds = durationInSeconds % 60;
+              textLog = `${minutes} phút ${seconds} giây`;
+            }
+
+            // 2. KẾT NỐI SOCKET TẠM THỜI ĐỂ GỬI BÁO CÁO VỀ PHÒNG CHAT
+            const tempSocket = io('https://hookchat-e6ad.onrender.com');
+            tempSocket.emit('send_message', {
+              conversationId: roomID,
+              senderId: currentUser._id || currentUser.id, // ID của người đang gọi
+              text: textLog,
+              messageType: 'call',
+              mediaUrl: '',
+            });
+
+            // 3. DỌN DẸP ZEGOCLOUD ĐỂ KHÔNG BỊ TREO CAMERA
             if (zegoInstanceRef.current && zegoInstanceRef.current !== 'LOADING') {
               try {
                 zegoInstanceRef.current.destroy();
               } catch (e) {}
             }
             zegoInstanceRef.current = null;
-            router.push('/');
+
+            // 4. CHỜ NỬA GIÂY CHO TIN NHẮN BAY ĐI RỒI MỚI VỀ TRANG CHỦ
+            setTimeout(() => {
+              tempSocket.disconnect();
+              window.location.href = '/'; // Chuyển trang cứng để reset state hoàn toàn
+            }, 500);
           },
         });
       } catch (error) {
