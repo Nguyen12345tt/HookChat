@@ -517,7 +517,7 @@ const handleTyping = (e) => {
       >
         
         {/* === 1. MENU TRÁI CÙNG === */}
-        <div className="w-[68px] border-r border-gray-700 flex flex-col items-center py-4 justify-between bg-[#242526] shrink-0 z-20 relative">
+        <div className="hidden md:flex w-[68px] border-r border-gray-700 flex-col items-center py-4 justify-between bg-[#242526] shrink-0 z-20 relative">
           <div className="flex flex-col gap-4">
             <button className="w-10 h-10 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center">💬</button>
             <button className="w-10 h-10 rounded-full hover:bg-gray-700 flex items-center justify-center text-xl">👥</button>
@@ -579,7 +579,7 @@ const handleTyping = (e) => {
         </div>
 
         {/* === 2. DANH SÁCH BẠN BÈ & NHÓM CHAT (CỘT BÊN TRÁI) === */}
-        <div className="w-[360px] border-r border-gray-700 flex flex-col bg-[#242526] shrink-0 z-10 relative">
+        <div className={`w-full md:w-[360px] border-r border-gray-700 flex-col bg-[#242526] shrink-0 z-10 relative ${activeConversation ? 'hidden md:flex' : 'flex'}`}>
           <div className="p-4 border-b border-gray-700/50 pb-3">
             <div className="flex items-center justify-between mb-4">
               <h1 className="text-2xl font-bold">Đoạn chat</h1>
@@ -698,7 +698,7 @@ const handleTyping = (e) => {
         </div>
 
         {/* === 3. KHUNG CHAT CHÍNH === */}
-        <div className="flex-1 flex flex-col bg-[#242526] min-w-0 w-full relative">
+        <div className={`flex-1 flex flex-col bg-[#242526] min-w-0 w-full relative ${!activeConversation ? 'hidden md:flex' : 'flex'}`}>
           
           {/* 🔥 MODAL: TẠO TIN NHẮN / TẠO NHÓM MỚI */}
           {showCreateGroupModal && (
@@ -933,12 +933,21 @@ const handleTyping = (e) => {
                   }
                 }
 
-return (
+                return (
                   <div className="h-[68px] px-4 border-b border-gray-700 flex items-center justify-between shadow-sm shrink-0 bg-[#242526] z-10">
                     
-                    {/* Thông tin người/nhóm đang chat */}
-                    <div className="flex items-center">
-                      <div className="relative w-10 h-10 shrink-0">
+                  {/* Thông tin người/nhóm đang chat */}
+                  <div className="flex items-center">
+  
+                  {/* NÚT BACK CHỈ HIỆN TRÊN MOBILE Ở ĐÂY BÁC NHÉ */}
+                    <button 
+                      onClick={() => setActiveConversation(null)}
+                      className="md:hidden mr-2 text-[#b0b3b8] hover:bg-[#3a3b3c] w-8 h-8 flex items-center justify-center rounded-full transition text-xl"
+                    >
+                      ❮
+                    </button>
+  
+  <div className="relative w-10 h-10 shrink-0">
                         <img src={headerAvatar} alt="Partner" className="w-full h-full bg-gray-600 rounded-full object-cover" />
                         {showOnlineDot && <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-[#242526] rounded-full"></div>}
                       </div>
