@@ -5,6 +5,9 @@ import { useRouter } from 'next/navigation';
 import { io } from 'socket.io-client';
 import axios from 'axios';
 
+// ==========================================
+// 📦 DỮ LIỆU TĨNH (Stickers, Avatar mặc định)
+// ==========================================
 const STICKER_PACKS = [
   {
     id: 'bear',
@@ -42,9 +45,13 @@ const DEFAULT_GROUP_AVATAR = 'https://cdn-icons-png.flaticon.com/512/166/166258.
 export default function Home() {
   const router = useRouter();
 
+  // ==========================================
+  // 1️⃣ STATE: QUẢN LÝ ĐĂNG NHẬP (Auth)
+  // ==========================================
   const [currentUser, setCurrentUser] = useState(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
+  // Hiệu ứng chạy 1 lần lúc mở trang: Kiểm tra xem đã đăng nhập chưa
   useEffect(() => {
     const checkAuth = () => {
       try {
@@ -69,57 +76,65 @@ export default function Home() {
         }, 100);
       }
     };
-
     checkAuth();
   }, []);
 
-  // --- STATE DỮ LIỆU & GIAO DIỆN ---
-  const [users, setUsers] = useState([]);
-  const [conversations, setConversations] = useState([]);
+  // ==========================================
+  // 2️⃣ STATE: QUẢN LÝ DỮ LIỆU CHAT & GIAO DIỆN
+  // ==========================================
+  const [users, setUsers] = useState([]); // Danh sách tất cả người dùng
+  const [conversations, setConversations] = useState([]); // Danh sách các phòng chat cột trái
 
-  const [activeConversation, setActiveConversation] = useState(null);
-  const [messages, setMessages] = useState([]);
-  const [inputText, setInputText] = useState('');
-  const [drafts, setDrafts] = useState({});
-  const [isUploading, setIsUploading] = useState(false);
-  const [isTyping, setIsTyping] = useState(false);
+  const [activeConversation, setActiveConversation] = useState(null); // Phòng chat đang mở
+  const [messages, setMessages] = useState([]); // Danh sách tin nhắn trong phòng
+  const [inputText, setInputText] = useState(''); // Chữ đang gõ
+  const [drafts, setDrafts] = useState({}); // Lưu bản nháp tin nhắn chưa gửi
+  const [isUploading, setIsUploading] = useState(false); // Trạng thái đang up ảnh
+  const [isTyping, setIsTyping] = useState(false); // Trạng thái "đang gõ..." của người kia
 
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false); // Bật/tắt bảng icon
   const [defaultEmojiToInput, setDefaultEmojiToInput] = useState('🙂');
-  const [replyingTo, setReplyingTo] = useState(null);
-  const [openMenuId, setOpenMenuId] = useState(null);
-  const [activeReactionId, setActiveReactionId] = useState(null);
-  const [popupPosition, setPopupPosition] = useState('up');
+  const [replyingTo, setReplyingTo] = useState(null); // Đang trả lời tin nhắn nào
+  const [openMenuId, setOpenMenuId] = useState(null); // Mở menu 3 chấm của tin nhắn nào
+  const [activeReactionId, setActiveReactionId] = useState(null); // Mở menu thả tim của tin nhắn nào
+  const [popupPosition, setPopupPosition] = useState('up'); // Hướng hiển thị popup
 
-  const [onlineUsers, setOnlineUsers] = useState([]);
-  const [tick, setTick] = useState(0);
+  const [onlineUsers, setOnlineUsers] = useState([]); // Danh sách những người đang online
+  const [tick, setTick] = useState(0); // Đồng hồ nhịp (để cập nhật phút hoạt động)
 
-  const [showStickerPicker, setShowStickerPicker] = useState(false);
+  const [showStickerPicker, setShowStickerPicker] = useState(false); // Bật/tắt bảng Nhãn dán
   const [activeStickerTab, setActiveStickerTab] = useState(STICKER_PACKS[0].id);
 
-  const [showPinnedModal, setShowPinnedModal] = useState(false);
-  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+  const [showPinnedModal, setShowPinnedModal] = useState(false); // Modal xem tin nhắn ghim
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false); // Menu cài đặt cá nhân
 
-  const [incomingCall, setIncomingCall] = useState(null);
+  // Quản lý Gọi điện & Nhạc chuông
+  const [incomingCall, setIncomingCall] = useState(null); // Có ai đang gọi tới không
+  const ringtoneRef = useRef(null); // Loa phát nhạc chuông
 
-  const socketRef = useRef(null);
-  const messagesEndRef = useRef(null);
-  const fileInputRef = useRef(null);
-  const inputRef = useRef(null);
-  const typingTimeoutRef = useRef(null);
-  const avatarInputRef = useRef(null);
-
-  const ringtoneRef = useRef(null);
-
+  // Quản lý Modal Thu hồi & Tạo nhóm
   const [recallModalData, setRecallModalData] = useState(null);
   const [recallOption, setRecallOption] = useState('everyone');
-
   const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
   const [selectedMembers, setSelectedMembers] = useState([]);
 
   const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
 
+  // ==========================================
+  // 3️⃣ CÁC USE_REF (Biến không làm re-render giao diện)
+  // ==========================================
+  const socketRef = useRef(null); // Chứa kết nối tới máy chủ Socket
+  const messagesEndRef = useRef(null); // Điểm đánh dấu cuối khung chat để cuộn
+  const fileInputRef = useRef(null); // Trỏ tới ô input file ẩn
+  const inputRef = useRef(null); // Trỏ tới ô nhập chữ
+  const typingTimeoutRef = useRef(null); // Bộ đếm thời gian gõ chữ
+  const avatarInputRef = useRef(null); // Trỏ tới ô up ảnh đại diện
+
+  // ==========================================
+  // 4️⃣ LOGIC NHẠC CHUÔNG GỌI ĐIỆN
+  // ==========================================
+  // Thiết lập file nhạc khi tải trang
   useEffect(() => {
     ringtoneRef.current = new Audio(
       'https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg'
@@ -127,6 +142,7 @@ export default function Home() {
     ringtoneRef.current.loop = true;
   }, []);
 
+  // Bật/tắt nhạc khi có cuộc gọi tới
   useEffect(() => {
     if (incomingCall) {
       ringtoneRef.current?.play().catch((e) => console.log('Trình duyệt chặn AutoPlay', e));
@@ -138,14 +154,19 @@ export default function Home() {
     }
   }, [incomingCall]);
 
+  // Bộ đếm cập nhật thời gian
   useEffect(() => {
     const interval = setInterval(() => setTick((t) => t + 1), 60000);
     return () => clearInterval(interval);
   }, []);
 
+  // ==========================================
+  // 5️⃣ KẾT NỐI MÁY CHỦ (SOCKET.IO)
+  // ==========================================
   useEffect(() => {
     if (isCheckingAuth || !currentUser) return;
 
+    // Lấy danh sách phòng chat từ Database
     const fetchConversationsSafe = async (userId) => {
       try {
         const res = await axios.get(
@@ -155,9 +176,11 @@ export default function Home() {
       } catch (error) {}
     };
 
+    // Khởi tạo Socket
     socketRef.current = io('https://hookchat-e6ad.onrender.com');
     socketRef.current.emit('user_connected', currentUser.id);
 
+    // Lắng nghe các sự kiện từ Server trả về
     socketRef.current.on('get_online_users', (users) => {
       setOnlineUsers(users);
     });
@@ -198,17 +221,18 @@ export default function Home() {
     socketRef.current.on('user_typing', (data) => {
       if (data.senderId !== currentUser.id) setIsTyping(true);
     });
-
     socketRef.current.on('user_stopped_typing', (data) => {
       if (data.senderId !== currentUser.id) setIsTyping(false);
     });
 
+    // Bắt tín hiệu có người gọi tới
     socketRef.current.on('incoming_call', (callData) => {
       if (callData.participantIds.includes(currentUser.id)) {
         setIncomingCall(callData);
       }
     });
 
+    // Lấy danh sách toàn bộ người dùng để thêm vào nhóm
     const fetchUsers = async () => {
       try {
         const res = await axios.get(
@@ -221,13 +245,20 @@ export default function Home() {
     fetchUsers();
     fetchConversationsSafe(currentUser.id);
 
+    // Dọn dẹp khi tắt trang
     return () => socketRef.current.disconnect();
   }, [isCheckingAuth, currentUser]);
 
+  // Cuộn xuống dòng tin nhắn mới nhất
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping]);
 
+  // ==========================================
+  // 6️⃣ CÁC HÀM XỬ LÝ SỰ KIỆN (Click, Gõ phím...)
+  // ==========================================
+
+  // Mở một phòng chat cụ thể
   const handleSelectConversation = async (conv) => {
     try {
       setActiveConversation(conv);
@@ -248,12 +279,12 @@ export default function Home() {
       setReplyingTo(null);
       setOpenMenuId(null);
       setActiveReactionId(null);
-
       setIsTyping(false);
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     } catch (error) {}
   };
 
+  // Khởi tạo cuộc gọi Video/Voice
   const handleStartCall = (type) => {
     if (!activeConversation) return;
     const participantIds = activeConversation.participants.map((p) => p._id || p);
@@ -270,6 +301,7 @@ export default function Home() {
     window.location.href = `/call/${activeConversation._id}?type=${type}`;
   };
 
+  // Tạo nhóm mới hoặc chat 1-1
   const handleCreateNewChat = async () => {
     if (selectedMembers.length === 0) return alert('Vui lòng chọn bạn bè!');
     try {
@@ -301,18 +333,16 @@ export default function Home() {
     }
   };
 
+  // Xử lý khi đang gõ chữ
   const handleTyping = (e) => {
     const text = e.target.value;
     setInputText(text);
-
     if (!activeConversation) return;
     setDrafts((prev) => ({ ...prev, [activeConversation._id]: text }));
-
     socketRef.current.emit('typing', {
       conversationId: activeConversation._id,
       senderId: currentUser.id,
     });
-
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     typingTimeoutRef.current = setTimeout(() => {
       socketRef.current.emit('stop_typing', {
@@ -322,6 +352,7 @@ export default function Home() {
     }, 2000);
   };
 
+  // Gửi tin nhắn Text
   const handleSendMessage = () => {
     if (!inputText.trim() || !activeConversation) return;
     const msgData = {
@@ -348,6 +379,7 @@ export default function Home() {
     inputRef.current?.focus();
   };
 
+  // Gửi Like
   const handleSendLike = () => {
     if (!activeConversation) return;
     socketRef.current.emit('send_message', {
@@ -360,6 +392,7 @@ export default function Home() {
     setShowEmojiPicker(false);
   };
 
+  // Gỡ/Thu hồi tin nhắn
   const handleRecallMessage = (messageId) => {
     if (!activeConversation) return;
     socketRef.current.emit('recall_message', {
@@ -369,35 +402,31 @@ export default function Home() {
     setOpenMenuId(null);
   };
 
+  // Up Ảnh đại diện (Cloudinary)
   const handleChangeAvatar = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
     setIsUpdatingAvatar(true);
     try {
       const sigResponse = await axios.get(
         'https://hookchat-e6ad.onrender.com/api/chat/upload-signature'
       );
       const { signature, timestamp, cloud_name, api_key } = sigResponse.data;
-
       const formData = new FormData();
       formData.append('file', file);
       formData.append('api_key', api_key);
       formData.append('timestamp', timestamp);
       formData.append('signature', signature);
       formData.append('folder', 'chat_images');
-
       const uploadResponse = await axios.post(
         `https://api.cloudinary.com/v1_1/${cloud_name}/image/upload`,
         formData
       );
       const newAvatarUrl = uploadResponse.data.secure_url;
-
       await axios.put(
         `https://hookchat-e6ad.onrender.com/api/chat/users/${currentUser.id}/avatar`,
         { avatarUrl: newAvatarUrl }
       );
-
       const updatedUser = { ...currentUser, avatar: newAvatarUrl };
       setCurrentUser(updatedUser);
       localStorage.setItem('user', JSON.stringify(updatedUser));
@@ -411,6 +440,7 @@ export default function Home() {
     }
   };
 
+  // Đổi tên người dùng
   const handleChangeName = async () => {
     const newName = prompt('Nhập tên người dùng mới:', currentUser?.name);
     if (newName === null) return;
@@ -434,6 +464,7 @@ export default function Home() {
     }
   };
 
+  // Gửi Hình ảnh vào đoạn chat
   const handleImageChange = async (e) => {
     const file = e.target.files[0];
     if (!file || !activeConversation) return;
@@ -443,14 +474,12 @@ export default function Home() {
         'https://hookchat-e6ad.onrender.com/api/chat/upload-signature'
       );
       const { signature, timestamp, cloud_name, api_key } = sigResponse.data;
-
       const formData = new FormData();
       formData.append('file', file);
       formData.append('api_key', api_key);
       formData.append('timestamp', timestamp);
       formData.append('signature', signature);
       formData.append('folder', 'chat_images');
-
       const uploadResponse = await axios.post(
         `https://api.cloudinary.com/v1_1/${cloud_name}/image/upload`,
         formData
@@ -470,6 +499,7 @@ export default function Home() {
     }
   };
 
+  // Gửi Nhãn dán
   const handleSendSticker = (stickerUrl) => {
     if (!activeConversation) return;
     socketRef.current.emit('send_message', {
@@ -482,6 +512,7 @@ export default function Home() {
     setShowStickerPicker(false);
   };
 
+  // Bấm vào tin nhắn ghim để cuộn tới tin nhắn đó
   const handleScrollToMessage = (messageId) => {
     const element = document.getElementById(`msg-${messageId}`);
     if (element) {
@@ -493,12 +524,14 @@ export default function Home() {
     }
   };
 
+  // Đăng xuất
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     window.location.href = '/login';
   };
 
+  // Format thời gian hoạt động cuối cùng
   const formatLastActive = (lastSeenDate) => {
     const targetDate = lastSeenDate ? new Date(lastSeenDate) : new Date(Date.now() - 5 * 60000);
     const now = new Date();
@@ -512,6 +545,7 @@ export default function Home() {
     return null;
   };
 
+  // Màn hình chờ Load dữ liệu lúc đầu
   if (isCheckingAuth)
     return (
       <div className='flex h-[100dvh] flex-col items-center justify-center bg-[#242526] text-[#b0b3b8]'>
@@ -525,6 +559,7 @@ export default function Home() {
       </div>
     );
 
+  // Lọc ra các tin nhắn đã ghim
   const pinnedMessages = messages.filter((m) => m.isPinned);
   const latestPinnedMsg =
     pinnedMessages.length > 0 ? pinnedMessages[pinnedMessages.length - 1] : null;
@@ -543,10 +578,9 @@ export default function Home() {
       >
         {/* ==================================================== */}
         {/* 🚀 CÁC HỘP THOẠI (MODAL) NỔI LÊN TOÀN MÀN HÌNH 🚀 */}
-        {/* Đưa ra ngoài cùng để không bao giờ bị ẩn trên Mobile */}
         {/* ==================================================== */}
 
-        {/* 1. Modal Gọi điện Tới */}
+        {/* --- MODAL 1: BẢNG ĐỔ CHUÔNG GỌI ĐIỆN TỚI --- */}
         {incomingCall && (
           <div className='absolute inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm transition-opacity'>
             <div className='animate-in zoom-in-95 flex w-[340px] flex-col items-center rounded-2xl border border-gray-700 bg-[#242526] p-8 shadow-[0_0_40px_rgba(0,132,255,0.3)]'>
@@ -590,7 +624,7 @@ export default function Home() {
           </div>
         )}
 
-        {/* 2. Modal Tạo Nhóm */}
+        {/* --- MODAL 2: TẠO NHÓM / CHAT 1-1 MỚI --- */}
         {showCreateGroupModal && (
           <div className='absolute inset-0 z-[100] flex items-center justify-center bg-black/60 transition-opacity'>
             <div
@@ -665,7 +699,7 @@ export default function Home() {
           </div>
         )}
 
-        {/* 3. Modal Tin nhắn đã ghim */}
+        {/* --- MODAL 3: BẢNG XEM TIN NHẮN ĐÃ GHIM --- */}
         {showPinnedModal && (
           <div className='absolute inset-0 z-50 flex items-center justify-center bg-black/60 transition-opacity'>
             <div
@@ -726,7 +760,7 @@ export default function Home() {
           </div>
         )}
 
-        {/* 4. Modal Thu hồi tin nhắn */}
+        {/* --- MODAL 4: XÁC NHẬN THU HỒI/GỠ TIN NHẮN --- */}
         {recallModalData && (
           <div className='absolute inset-0 z-[100] flex items-center justify-center bg-black/60 transition-opacity'>
             <div
@@ -794,11 +828,12 @@ export default function Home() {
         )}
 
         {/* ==================================================== */}
-        {/* CỘT 1: DANH SÁCH BẠN BÈ & NHÓM CHAT (Đứng giữa trên Desktop) */}
+        {/* 📚 CỘT 1: DANH SÁCH BẠN BÈ & NHÓM CHAT (Đứng giữa màn hình máy tính) */}
         {/* ==================================================== */}
         <div
           className={`relative z-10 w-full flex-1 shrink-0 flex-col border-r border-gray-700 bg-[#242526] md:w-[360px] md:flex-none ${activeConversation ? 'hidden md:flex' : 'flex'}`}
         >
+          {/* Header Tìm kiếm & Nút tạo mới */}
           <div className='border-b border-gray-700/50 p-4 pb-3'>
             <div className='mb-4 flex items-center justify-between'>
               <h1 className='text-2xl font-bold'>Đoạn chat</h1>
@@ -819,6 +854,7 @@ export default function Home() {
             />
           </div>
 
+          {/* Vòng lặp hiển thị danh sách phòng chat */}
           <div className='flex-1 overflow-y-auto'>
             {conversations.length === 0 && (
               <p className='mt-4 text-center text-sm text-gray-500'>
@@ -838,7 +874,6 @@ export default function Home() {
               } else {
                 let partner = conv.participants?.find((p) => (p._id || p) !== currentUser.id);
                 if (!partner) partner = conv.participants?.[0];
-
                 if (partner) {
                   name = partner.name || 'Người dùng';
                   avatar = partner.avatar || DEFAULT_AVATAR;
@@ -893,7 +928,6 @@ export default function Home() {
                             ? 'đã gửi nhãn dán'
                             : 'đã gửi một ảnh';
                         else content = conv.latestMessage.text;
-
                         messagePreview = conv.isGroup
                           ? `${prefix}: ${content}`
                           : isMine
@@ -921,19 +955,19 @@ export default function Home() {
         </div>
 
         {/* ==================================================== */}
-        {/* CỘT 2: KHUNG CHAT CHÍNH (Nằm bên phải trên Desktop) */}
+        {/* 💬 CỘT 2: KHUNG CHAT CHÍNH (Chiếm diện tích lớn nhất) */}
         {/* ==================================================== */}
         <div
           className={`relative flex w-full min-w-0 flex-1 flex-col bg-[#242526] ${!activeConversation ? 'hidden md:flex' : 'flex'}`}
         >
           {activeConversation ? (
             <>
+              {/* --- HEADER KHUNG CHAT (Ảnh đại diện, Tên, Nút gọi điện) --- */}
               {(() => {
                 let headerName = 'Đang tải...';
                 let headerAvatar = DEFAULT_AVATAR;
                 let headerSubText = '';
                 let showOnlineDot = false;
-
                 if (activeConversation) {
                   if (activeConversation.isGroup) {
                     headerName = activeConversation.groupName || 'Nhóm';
@@ -960,6 +994,7 @@ export default function Home() {
                 return (
                   <div className='z-10 flex h-[68px] shrink-0 items-center justify-between border-b border-gray-700 bg-[#242526] px-4 shadow-sm'>
                     <div className='flex items-center'>
+                      {/* Nút Quay Lại dành riêng cho màn hình Mobile */}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -984,6 +1019,7 @@ export default function Home() {
                         <p className='text-[12px] text-[#b0b3b8]'>{headerSubText}</p>
                       </div>
                     </div>
+                    {/* Các Nút Gọi Điện / Menu */}
                     <div className='flex items-center gap-2 text-[#0084ff]'>
                       <button
                         onClick={(e) => {
@@ -1011,6 +1047,7 @@ export default function Home() {
                 );
               })()}
 
+              {/* --- THANH THÔNG BÁO TIN NHẮN ĐÃ GHIM --- */}
               {pinnedMessages.length > 0 && (
                 <div
                   onClick={(e) => {
@@ -1042,6 +1079,7 @@ export default function Home() {
                 </div>
               )}
 
+              {/* --- DANH SÁCH TIN NHẮN (LỊCH SỬ CHAT) --- */}
               <div className='flex-1 space-y-1.5 overflow-y-auto p-4'>
                 {messages.map((msg, index) => {
                   const isMine =
@@ -1051,6 +1089,7 @@ export default function Home() {
                     msg.messageType === 'image' && msg.mediaUrl?.includes('?type=sticker');
                   const isLastMessage = index === messages.length - 1;
 
+                  // Bộ 3 nút thao tác khi di chuột vào tin nhắn (Reaction, Trả lời, Mở rộng)
                   const HoverActions = () => {
                     const visibilityClass =
                       activeReactionId === msg._id || openMenuId === msg._id
@@ -1062,6 +1101,7 @@ export default function Home() {
                       <div
                         className={`flex items-center gap-1 text-[#b0b3b8] transition-opacity ${isMine ? 'mr-2' : 'ml-2'} ${visibilityClass}`}
                       >
+                        {/* Biểu tượng Reaction (Thả tim) */}
                         <div className='relative flex items-center'>
                           <button
                             onClick={(e) => {
@@ -1102,6 +1142,7 @@ export default function Home() {
                             </div>
                           )}
                         </div>
+                        {/* Nút Trả lời (Reply) */}
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -1111,6 +1152,7 @@ export default function Home() {
                         >
                           ↩️
                         </button>
+                        {/* Nút Tùy chọn (Thu hồi/Ghim) */}
                         <div className='relative flex items-center'>
                           <button
                             onClick={(e) => {
@@ -1232,6 +1274,7 @@ export default function Home() {
                               )}
                             </>
                           )}
+                          {/* Hiển thị danh sách Reaction của tin nhắn */}
                           {msg.reactions && msg.reactions.length > 0 && !msg.isRecalled && (
                             <div
                               className={`absolute -bottom-2 ${isMine ? 'right-0' : 'left-0'} z-10 flex origin-bottom scale-90 items-center rounded-full border border-gray-700 bg-[#242526] px-1.5 py-[1px] shadow-md`}
@@ -1251,6 +1294,7 @@ export default function Home() {
                         </div>
                         {!isMine && !msg.isRecalled && <HoverActions />}
                       </div>
+                      {/* Avatar thu nhỏ báo hiệu người nhận đã đọc */}
                       {isMine && isLastMessage && msg.isRead && (
                         <div className='animate-in slide-in-from-top-1 fade-in mt-1 mr-2 flex justify-end duration-300'>
                           <div className='h-3.5 w-3.5 overflow-hidden rounded-full bg-gray-600 shadow-sm ring-[1.5px] ring-[#242526]'>
@@ -1277,6 +1321,7 @@ export default function Home() {
                     </div>
                   );
                 })}
+                {/* Dấu hiệu ⏳ Đang tải ảnh */}
                 {isUploading && (
                   <div className='mt-2 flex justify-end'>
                     <div className='animate-pulse rounded-xl bg-[#3a3b3c] px-3 py-2 text-xs'>
@@ -1284,6 +1329,7 @@ export default function Home() {
                     </div>
                   </div>
                 )}
+                {/* Dấu hiệu nhảy "..." khi đang gõ */}
                 {isTyping && (
                   <div className='animate-in fade-in z-10 mt-2 mb-2 ml-1 flex items-center gap-2 duration-300'>
                     <div className='flex h-[36px] w-fit items-center gap-1.5 rounded-2xl rounded-bl-sm bg-[#3a3b3c] px-3 py-2'>
@@ -1305,7 +1351,12 @@ export default function Home() {
                 <div ref={messagesEndRef} />
               </div>
 
+              {/* ==================================================== */}
+              {/* KHU VỰC NHẬP TIN NHẮN */}
+              {/* (Bao gồm chức năng Trả lời, Thêm Ảnh, Sticker, Gửi) */}
+              {/* ==================================================== */}
               <div className='flex flex-col border-t border-transparent bg-[#242526]'>
+                {/* Thanh thông báo Đang trả lời tin nhắn */}
                 {replyingTo && (
                   <div className='animate-in slide-in-from-bottom-2 flex items-center justify-between border-t border-gray-700/50 bg-[#242526] px-4 py-2'>
                     <div className='flex flex-col overflow-hidden'>
@@ -1330,42 +1381,54 @@ export default function Home() {
                     </button>
                   </div>
                 )}
+
+                {/* --- KHUNG NHẬP CHÍNH (Đã áp dụng responsive cho Mobile) --- */}
                 <div
                   className='relative flex w-full shrink-0 items-center gap-1.5 p-2 px-2 sm:gap-2 sm:p-3 sm:px-4'
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <button className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-2xl text-[#0084ff] transition hover:bg-[#3a3b3c]'>
-                    ⊕
-                  </button>
-                  <input
-                    type='file'
-                    ref={fileInputRef}
-                    onChange={handleImageChange}
-                    accept='image/*'
-                    className='hidden'
-                  />
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      fileInputRef.current.click();
-                    }}
-                    className='relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xl text-[#0084ff] transition hover:bg-[#3a3b3c]'
+                  {/* CỤM 3 NÚT TIỆN ÍCH (Tự động giấu đi khi gõ chữ trên màn hình nhỏ) */}
+                  <div
+                    className={`shrink-0 items-center gap-1.5 transition-all sm:gap-2 ${inputText.trim() ? 'hidden sm:flex' : 'flex'}`}
                   >
-                    🖼️
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowStickerPicker(!showStickerPicker);
-                      setShowEmojiPicker(false);
-                      setShowSettingsMenu(false);
-                    }}
-                    className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[20px] text-[#0084ff] transition hover:bg-[#3a3b3c] ${showStickerPicker ? 'bg-[#3a3b3c]' : ''}`}
-                    title='Nhãn dán'
-                  >
-                    🧸
-                  </button>
-                  <div className='relative flex flex-1 items-center rounded-full bg-[#3a3b3c] pr-1 pl-3'>
+                    {/* Nút cộng thêm tiện ích (Hiện đang để Decorate) */}
+                    <button className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-2xl text-[#0084ff] transition hover:bg-[#3a3b3c]'>
+                      ⊕
+                    </button>
+                    {/* Nút chọn Ảnh */}
+                    <input
+                      type='file'
+                      ref={fileInputRef}
+                      onChange={handleImageChange}
+                      accept='image/*'
+                      className='hidden'
+                    />
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        fileInputRef.current.click();
+                      }}
+                      className='relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xl text-[#0084ff] transition hover:bg-[#3a3b3c]'
+                    >
+                      🖼️
+                    </button>
+                    {/* Nút gọi Modal Sticker (Nhãn dán) */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowStickerPicker(!showStickerPicker);
+                        setShowEmojiPicker(false);
+                        setShowSettingsMenu(false);
+                      }}
+                      className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[20px] text-[#0084ff] transition hover:bg-[#3a3b3c] ${showStickerPicker ? 'bg-[#3a3b3c]' : ''}`}
+                      title='Nhãn dán'
+                    >
+                      🧸
+                    </button>
+                  </div>
+
+                  {/* KHUNG GÕ CHỮ (Sử dụng min-w-0 để không bị đẩy tràn viền trên Mobile) */}
+                  <div className='relative flex min-w-0 flex-1 items-center rounded-full bg-[#3a3b3c] pr-1 pl-3'>
                     <input
                       ref={inputRef}
                       type='text'
@@ -1375,6 +1438,7 @@ export default function Home() {
                       placeholder='Aa'
                       className='min-w-0 flex-1 bg-transparent py-2.5 text-[15px] outline-none'
                     />
+                    {/* Bật/Tắt bảng icon Emoji */}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -1387,16 +1451,19 @@ export default function Home() {
                       {defaultEmojiToInput}
                     </button>
                   </div>
+
+                  {/* NÚT GỬI / LIKE (Đã thêm min-w để chữ Gửi không bị bóp méo) */}
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       inputText.trim() ? handleSendMessage() : handleSendLike();
                     }}
-                    className='flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xl font-bold text-[#0084ff] transition hover:bg-[#3a3b3c]'
+                    className='flex h-10 min-w-[40px] shrink-0 items-center justify-center rounded-full px-2 text-[16px] font-bold text-[#0084ff] transition hover:bg-[#3a3b3c]'
                   >
                     {inputText.trim() ? 'Gửi' : '👍'}
                   </button>
 
+                  {/* --- Bảng hiển thị Nhãn Dán (Stickers Picker) --- */}
                   {showStickerPicker && (
                     <div className='absolute bottom-16 left-20 z-50 flex h-[340px] w-[320px] flex-col overflow-hidden rounded-xl border border-gray-700 bg-[#242526] shadow-2xl'>
                       <div className='flex items-center gap-1 overflow-x-auto border-b border-gray-700 bg-[#3a3b3c]/50 p-2'>
@@ -1436,6 +1503,8 @@ export default function Home() {
                       </div>
                     </div>
                   )}
+
+                  {/* --- Bảng hiển thị Icon (Emoji Picker) --- */}
                   {showEmojiPicker && (
                     <div className='absolute right-12 bottom-16 z-50 shadow-2xl'>
                       <EmojiPicker
@@ -1451,6 +1520,7 @@ export default function Home() {
               </div>
             </>
           ) : (
+            // Trạng thái khi chưa chọn người để nhắn tin
             <div className='flex flex-1 flex-col items-center justify-center text-gray-500'>
               <span className='mb-4 text-6xl'>💬</span>
               <p>Chọn một người bạn ở cột bên trái hoặc bấm ✏️ để bắt đầu</p>
@@ -1459,7 +1529,8 @@ export default function Home() {
         </div>
 
         {/* ==================================================== */}
-        {/* CỘT 3: THANH ĐIỀU HƯỚNG (Nằm dưới cùng trên Mobile, Bên trái trên Desktop) */}
+        {/* 🧭 CỘT 3: THANH ĐIỀU HƯỚNG TỔNG QUÁT */}
+        {/* (Nằm Nganh dưới đáy trên Mobile / Nằm dọc bên trái trên Desktop) */}
         {/* ==================================================== */}
         <div
           className={`relative z-20 w-full shrink-0 flex-row items-center justify-between border-t border-gray-700 bg-[#242526] px-6 py-2 md:order-first md:w-[68px] md:flex-col md:border-t-0 md:border-r md:px-0 md:py-4 ${activeConversation ? 'hidden md:flex' : 'flex'}`}
@@ -1495,6 +1566,7 @@ export default function Home() {
           </div>
 
           <div className='relative ml-auto flex items-center md:mt-auto md:ml-0 md:flex-col'>
+            {/* Modal Tùy chọn Tài khoản cá nhân */}
             {showSettingsMenu && (
               <div
                 className='absolute right-0 bottom-14 z-50 w-[280px] overflow-hidden rounded-xl border border-gray-700 bg-[#242526] py-2 shadow-[0_0_15px_rgba(0,0,0,0.5)] md:right-auto md:bottom-12 md:left-4'
@@ -1504,7 +1576,6 @@ export default function Home() {
                   <span className='font-semibold'>Tùy chọn</span>
                   <span className='text-[#b0b3b8]'>⚙️</span>
                 </div>
-
                 <input
                   type='file'
                   ref={avatarInputRef}
@@ -1518,7 +1589,6 @@ export default function Home() {
                 >
                   <span>{isUpdatingAvatar ? '⏳ Đang tải ảnh lên...' : '🖼️ Đổi ảnh đại diện'}</span>
                 </div>
-
                 <div
                   onClick={handleChangeName}
                   className='cursor-pointer px-4 py-2 text-[#e4e6eb] transition hover:bg-[#3a3b3c]'
@@ -1550,7 +1620,7 @@ export default function Home() {
                 </div>
               </div>
             )}
-
+            {/* Cục bấm Avatar bật Tùy chọn */}
             <div
               onClick={(e) => {
                 e.stopPropagation();
