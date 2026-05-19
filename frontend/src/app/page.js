@@ -275,8 +275,8 @@ export default function Home() {
       participantIds: participantIds,
     });
 
-    // Chuyển luôn người gọi vào phòng Zego chờ
-    router.push(`/call/${activeConversation._id}?type=${type}`);
+    // Ép trình duyệt tải lại trang để ZegoCloud khởi động chuẩn 100%
+    window.location.href = `/call/${activeConversation._id}?type=${type}`;
   };
 
   const handleCreateNewChat = async () => {
@@ -788,8 +788,9 @@ export default function Home() {
                   </button>
                   <button
                     onClick={() => {
-                      router.push(`/call/${incomingCall.roomId}?type=${incomingCall.type}`);
+                      const callUrl = `/call/${incomingCall.roomId}?type=${incomingCall.type}`;
                       setIncomingCall(null);
+                      window.location.href = callUrl; // Chuyển trang cứng
                     }}
                     className='group flex flex-1 flex-col items-center gap-2'
                   >
