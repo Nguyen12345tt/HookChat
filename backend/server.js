@@ -25,15 +25,33 @@ const server = http.createServer(app);
 const dns = require('dns');
 dns.setServers(['1.1.1.1', '8.8.8.8']);
 
-app.use(cors({ origin: 'http://localhost:3000' }));
+app.use(cors({ 
+  origin: [
+    'http://localhost:3000',
+    'https://hook-chat-three.vercel.app'
+  ]
+}));
 app.use(express.json());
 
 app.use('/api/chat', chatRoutes);
 app.use('/api/auth', authRoutes);
 
-const io = new Server(server, {
-  cors: { origin: 'http://localhost:3000' }
-});
+const io = new Server
+(
+  server, 
+  {
+    cors: 
+    { 
+      origin: 
+      [
+        'http://localhost:3000',
+        'https://hook-chat-three.vercel.app'
+      ],
+
+      methods : ["GET", "POST", "PUT"] 
+    }
+  }
+);
 
 io.on('connection', (socket) => {
   socket.on("user_connected", (userId) => {
