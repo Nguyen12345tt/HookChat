@@ -13,33 +13,50 @@ const EmojiPicker = dynamic(() => import('emoji-picker-react'), {
   loading: () => null,
 });
 
+// ==========================================
+// 📦 DỮ LIỆU TĨNH (Stickers Không Nền Chuẩn Xịn)
+// ==========================================
 const STICKER_PACKS = [
   {
-    id: 'bear',
-    icon: '🐻',
+    id: 'yellow_face',
+    icon: '😀',
     stickers: [
-      'https://media.giphy.com/media/11s7Ke7jcNxCHS/giphy.gif?type=sticker',
-      'https://media.giphy.com/media/l41lVsYDBC0UVQJCE/giphy.gif?type=sticker',
-      'https://media.giphy.com/media/xT0xeDCj9LhRHLsP1C/giphy.gif?type=sticker',
-      'https://media.giphy.com/media/3o7TKMt1VVNkHV2PaE/giphy.gif?type=sticker',
-      'https://media.giphy.com/media/cfuL5gqFDreXxkWQ4o/giphy.gif?type=sticker',
-      'https://media.giphy.com/media/3o85xwxr06YNoFdSbm/giphy.gif?type=sticker',
-      'https://media.giphy.com/media/11ezOCtJ7Eetri/giphy.gif?type=sticker',
-      'https://media.giphy.com/media/XG1ZvlZf4aMfe/giphy.gif?type=sticker',
+      'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Smilies/Face%20with%20Tears%20of%20Joy.png',
+      'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Smilies/Rolling%20on%20the%20Floor%20Laughing.png',
+      'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Smilies/Smiling%20Face%20with%20Heart-Eyes.png',
+      'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Smilies/Face%20Blowing%20a%20Kiss.png',
+      'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Smilies/Thinking%20Face.png',
+      'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Smilies/Enraged%20Face.png',
+      'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Smilies/Crying%20Face.png',
+      'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Smilies/Partying%20Face.png',
     ],
   },
   {
-    id: 'cat',
-    icon: '🐱',
+    id: 'animals',
+    icon: '🐻',
     stickers: [
-      'https://media.giphy.com/media/ICOgUNjpvO0PC/giphy.gif?type=sticker',
-      'https://media.giphy.com/media/vFKqnCdLPNOKc/giphy.gif?type=sticker',
-      'https://media.giphy.com/media/mlvseq9yvZhba/giphy.gif?type=sticker',
-      'https://media.giphy.com/media/3oriO0OEd9QIDdllqo/giphy.gif?type=sticker',
-      'https://media.giphy.com/media/JIX9t2j0ZTN9S/giphy.gif?type=sticker',
-      'https://media.giphy.com/media/C9x8gX02SnMIoAClXa/giphy.gif?type=sticker',
-      'https://media.giphy.com/media/VbnUQpnihPSIgIXuZv/giphy.gif?type=sticker',
-      'https://media.giphy.com/media/BzyTuYCmvSORqs1ABM/giphy.gif?type=sticker',
+      'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Animals/Bear.png',
+      'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Animals/Cat%20Face.png',
+      'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Animals/Dog%20Face.png',
+      'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Animals/Fox.png',
+      'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Animals/Panda.png',
+      'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Animals/Rabbit%20Face.png',
+      'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Animals/Tiger%20Face.png',
+      'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Animals/Monkey%20Face.png',
+    ],
+  },
+  {
+    id: 'gestures',
+    icon: '👍',
+    stickers: [
+      'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Hand%20gestures/Thumbs%20Up.png',
+      'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Hand%20gestures/Heart%20Hands.png',
+      'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Hand%20gestures/Clapping%20Hands.png',
+      'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Hand%20gestures/Waving%20Hand.png',
+      'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Hand%20gestures/Folded%20Hands.png',
+      'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Hand%20gestures/Handshake.png',
+      'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Hand%20gestures/Ok%20Hand.png',
+      'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Hand%20gestures/Flexed%20Biceps.png',
     ],
   },
 ];
