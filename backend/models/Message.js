@@ -38,7 +38,7 @@ const MessageSchema = new mongoose.Schema(
     isRecalled: { type: Boolean, default: false },
 
     replyTo: {
-      massageId: string,
+      messageId: string,
       text: string,
       senderName: string,
       messageType: string,
