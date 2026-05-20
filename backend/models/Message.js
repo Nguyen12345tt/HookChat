@@ -38,11 +38,11 @@ const MessageSchema = new mongoose.Schema(
     isRecalled: { type: Boolean, default: false },
 
     replyTo: {
-      messageId: string,
-      text: string,
-      senderName: string,
-      messageType: string,
-      mediaUrl: string,
+      messageId: String,
+      text: String,
+      senderName: String,
+      messageType: String,
+      mediaUrl: String,
     },
 
     // 🔥 THÊM DÒNG NÀY: Mảng lưu trữ cảm xúc
