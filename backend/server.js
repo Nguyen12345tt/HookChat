@@ -153,26 +153,28 @@ io.on("connection", (socket) => {
     socket.broadcast.emit("call_accepted", data);
   });
 
-  socket.on("react_message", async (data) => {
-    const { messageId, userId, emoji, conversationId } = data;
+  socket.on("send_message", async (data) => {
+    // 🔥 Lấy thêm biến replyTo từ Frontend gửi lên
+    const { conversationId, senderId, text, messageType, mediaUrl, replyTo } =
+      data;
     try {
-      const msg = await Message.findById(messageId).populate(
+      const newMessage = new Message({
+        conversationId,
+        senderId,
+        text,
+        messageType,
+        mediaUrl,
+        replyTo, // 🔥 Lưu vào Database
+      });
+      await newMessage.save();
+      await Conversation.findByIdAndUpdate(conversationId, {
+        latestMessage: newMessage._id,
+      });
+      const populatedMsg = await Message.findById(newMessage._id).populate(
         "senderId",
         "name avatar",
       );
-      if (!msg) return;
-      const existingReactionIndex = msg.reactions.findIndex(
-        (r) => r.userId.toString() === userId,
-      );
-      if (existingReactionIndex !== -1) {
-        if (msg.reactions[existingReactionIndex].emoji === emoji)
-          msg.reactions.splice(existingReactionIndex, 1);
-        else msg.reactions[existingReactionIndex].emoji = emoji;
-      } else {
-        msg.reactions.push({ emoji, userId });
-      }
-      await msg.save();
-      io.to(conversationId).emit("update_message", msg);
+      io.to(conversationId).emit("receive_message", populatedMsg);
     } catch (error) {}
   });
 });
