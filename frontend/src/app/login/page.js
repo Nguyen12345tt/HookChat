@@ -147,11 +147,19 @@ export default function Login() {
 
           <div className='mt-6 text-center'>
             <button
-              onClick={() => {
-                setIsLoginMode(!isLoginMode);
+              type='button'
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsLoginMode((prev) => !prev);
                 setError('');
               }}
-              className='text-sm text-blue-600 hover:text-blue-500 dark:text-blue-400'
+              onTouchEnd={(e) => {
+                e.preventDefault();
+                setIsLoginMode((prev) => !prev);
+                setError('');
+              }}
+              className='inline-flex min-h-[44px] items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold text-blue-600 active:bg-blue-50 dark:text-blue-400 dark:active:bg-[#3a3b3c]'
             >
               {isLoginMode
                 ? 'Chưa có tài khoản? Đăng ký ngay'
