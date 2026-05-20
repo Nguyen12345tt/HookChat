@@ -57,7 +57,7 @@ export default function Login() {
         // 2. Hiện Toast Thành công và đợi 1 giây rồi mới vào trang Chủ cho mượt
         showToast('Đăng nhập thành công!', 'success');
         setTimeout(() => {
-          router.push('/');
+          window.location.href = '/'; // Ép tải lại trang cứng để kết nối Socket tươi mới 100%
         }, 1000);
       } else {
         // GỌI API ĐĂNG KÝ
