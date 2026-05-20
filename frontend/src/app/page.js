@@ -1850,7 +1850,7 @@ export default function Home() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            fetchGroupMembersDetail();
+                            fetchGroupMembersDetail(); // Lấy danh sách thành viên hiện tại
                             setShowGroupSettingsModal(true);
                           }}
                           className='flex h-9 w-9 items-center justify-center rounded-full text-[20px] transition hover:bg-[#3a3b3c]'
