@@ -1060,7 +1060,7 @@ export default function Home() {
         {/* 💬 CỘT 2: KHUNG CHAT CHÍNH (Chiếm diện tích lớn nhất) */}
         {/* ==================================================== */}
         <div
-          className={`relative flex w-full min-w-0 flex-1 flex-col bg-[#242526] ${!activeConversation ? 'hidden md:flex' : 'flex'}`}
+          className={`relative flex min-h-0 w-full min-w-0 flex-1 flex-col bg-[#242526] ${!activeConversation ? 'hidden md:flex' : 'flex'}`}
         >
           {activeConversation ? (
             <>
@@ -1182,7 +1182,7 @@ export default function Home() {
               )}
 
               {/* --- DANH SÁCH TIN NHẮN (LỊCH SỬ CHAT) --- */}
-              <div className='flex-1 space-y-1.5 overflow-y-auto p-4'>
+              <div className='min-h-0 flex-1 space-y-1.5 overflow-y-auto overscroll-contain p-4'>
                 {messages.map((msg, index) => {
                   const isMine =
                     msg.senderId?._id === currentUser.id || msg.senderId === currentUser.id;
