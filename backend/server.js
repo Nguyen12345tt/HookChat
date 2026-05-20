@@ -107,28 +107,6 @@ io.on("connection", (socket) => {
     } catch (error) {}
   });
 
-  socket.on("send_message", async (data) => {
-    const { conversationId, senderId, text, messageType, mediaUrl } = data;
-    try {
-      const newMessage = new Message({
-        conversationId,
-        senderId,
-        text,
-        messageType,
-        mediaUrl,
-      });
-      await newMessage.save();
-      await Conversation.findByIdAndUpdate(conversationId, {
-        latestMessage: newMessage._id,
-      });
-      const populatedMsg = await Message.findById(newMessage._id).populate(
-        "senderId",
-        "name avatar",
-      );
-      io.to(conversationId).emit("receive_message", populatedMsg);
-    } catch (error) {}
-  });
-
   socket.on("recall_message", async (data) => {
     const { messageId, conversationId } = data;
     try {
