@@ -268,4 +268,52 @@ router.get("/conversations/user/:userId", async (req, res) => {
   }
 });
 
+// ======================= CHẶN VÀ XÓA =======================
+
+// [DELETE] XÓA ĐOẠN CHAT VÀ TIN NHẮN BÊN TRONG
+router.delete("/conversations/:conversationId", async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+
+    // 1. Xóa toàn bộ tin nhắn thuộc về ID đoạn chat này
+    await Message.deleteMany({ conversationId: conversationId });
+
+    // 2. Xóa chính bản thân đoạn chat đó
+    await Conversation.findByIdAndDelete(conversationId);
+
+    res.status(200).json({ message: "Đã xóa vĩnh viễn đoạn chat và tin nhắn" });
+  } catch (error) {
+    console.error("Lỗi xóa chat:", error);
+    res.status(500).json({ error: "Lỗi máy chủ khi xóa đoạn chat" });
+  }
+});
+
+// [POST] CHẶN NGƯỜI DÙNG
+router.post("/users/block", async (req, res) => {
+  try {
+    const { blockerId, blockedId } = req.body;
+
+    // Tìm người yêu cầu chặn
+    const user = await User.findById(blockerId);
+    if (!user)
+      return res.status(404).json({ error: "Không tìm thấy người dùng" });
+
+    // Nếu chưa chặn thì thêm vào danh sách đen
+    if (!user.blockedUsers.includes(blockedId)) {
+      user.blockedUsers.push(blockedId);
+      await user.save();
+    }
+
+    res
+      .status(200)
+      .json({
+        message: "Đã chặn người dùng thành công",
+        blockedUsers: user.blockedUsers,
+      });
+  } catch (error) {
+    console.error("Lỗi chặn user:", error);
+    res.status(500).json({ error: "Lỗi máy chủ khi chặn" });
+  }
+});
+
 module.exports = router;
