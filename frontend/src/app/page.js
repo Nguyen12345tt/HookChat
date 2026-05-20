@@ -854,7 +854,7 @@ export default function Home() {
                       <div className='h-11 w-11 shrink-0 overflow-hidden rounded-full bg-gray-600'>
                         <img src={msg.senderId?.avatar || DEFAULT_AVATAR} alt='Avatar' />
                       </div>
-                      <div className='flex flex-1 flex-col overflow-hidden pr-10'>
+                      <div className='flex flex-1 flex-col overflow-hidden pr-12'>
                         <div className='flex items-center gap-2'>
                           <span className='text-[15px] font-semibold text-[#e4e6eb]'>
                             {msg.senderId?._id === currentUser.id ? 'Bạn' : msg.senderId?.name}
@@ -871,6 +871,21 @@ export default function Home() {
                             : msg.text}
                         </span>
                       </div>
+
+                      {/* 🔥 NÚT BỎ GHIM (ẨN ĐI, KHI DI CHUỘT VÀO MỚI HIỆN) 🔥 */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation(); // Chặn sự kiện click để không bị cuộn tới tin nhắn
+                          socketRef.current.emit('toggle_pin', {
+                            messageId: msg._id,
+                            conversationId: activeConversation._id,
+                          });
+                        }}
+                        className='absolute right-4 flex h-8 w-8 items-center justify-center rounded-full bg-[#242526] text-[#b0b3b8] opacity-0 shadow-md transition-all group-hover:opacity-100 hover:bg-[#4e4f50] hover:text-[#ff3b30]'
+                        title='Bỏ ghim'
+                      >
+                        ✕
+                      </button>
                     </div>
                   ))
                 )}
