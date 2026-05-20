@@ -16,7 +16,7 @@ const MessageSchema = new mongoose.Schema(
     // 1. Phân loại tin nhắn để Frontend biết đường hiển thị
     messageType: {
       type: String,
-      enum: ["text", "image", "audio", "video"],
+      enum: ["text", "image", "audio", "video", "call"],
       default: "text",
     },
 
