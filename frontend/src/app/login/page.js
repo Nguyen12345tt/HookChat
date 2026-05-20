@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
 
@@ -15,6 +15,17 @@ export default function Login() {
   // State quản lý trạng thái tải và lỗi
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const mode = params.get('mode');
+
+    if (mode === 'register') {
+      setIsLoginMode(false);
+    } else {
+      setIsLoginMode(true);
+    }
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -44,8 +55,10 @@ export default function Login() {
         });
 
         alert('Đăng ký thành công! Vui lòng đăng nhập lại.');
-        setIsLoginMode(true); // Tự động lật sang form đăng nhập
-        setPassword(''); // Xóa pass cũ đi cho an toàn
+        setName('');
+        setEmail('');
+        setPassword('');
+        window.location.href = '/login';
       }
     } catch (err) {
       // Bắt lỗi từ Backend trả về (như sai pass, trùng email...)
@@ -146,25 +159,21 @@ export default function Login() {
           </form>
 
           <div className='mt-6 text-center'>
-            <button
-              type='button'
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setIsLoginMode((prev) => !prev);
-                setError('');
-              }}
-              onTouchEnd={(e) => {
-                e.preventDefault();
-                setIsLoginMode((prev) => !prev);
-                setError('');
-              }}
-              className='inline-flex min-h-[44px] items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold text-blue-600 active:bg-blue-50 dark:text-blue-400 dark:active:bg-[#3a3b3c]'
-            >
-              {isLoginMode
-                ? 'Chưa có tài khoản? Đăng ký ngay'
-                : 'Đã có tài khoản? Quay lại Đăng nhập'}
-            </button>
+            {isLoginMode ? (
+              <a
+                href='/login?mode=register'
+                className='inline-flex min-h-[44px] items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold text-blue-600 dark:text-blue-400'
+              >
+                Chưa có tài khoản? Đăng ký ngay
+              </a>
+            ) : (
+              <a
+                href='/login'
+                className='inline-flex min-h-[44px] items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold text-blue-600 dark:text-blue-400'
+              >
+                Đã có tài khoản? Quay lại Đăng nhập
+              </a>
+            )}
           </div>
         </div>
       </div>
