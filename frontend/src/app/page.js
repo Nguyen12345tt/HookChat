@@ -126,12 +126,17 @@ export default function Home() {
   const [mobileMenuMsg, setMobileMenuMsg] = useState(null);
   const pressTimerRef = useRef(null);
 
-  // 🎤 QUẢN LÝ GHI ÂM (MỚI THÊM)
+  // 🎤 QUẢN LÝ GHI ÂM CHUẨN ZALO
+  const [showAudioRecorder, setShowAudioRecorder] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
+  const [audioBlob, setAudioBlob] = useState(null);
+  const [audioText, setAudioText] = useState('');
+
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const recordingTimerRef = useRef(null);
+  const recognitionRef = useRef(null); // Bộ nhận diện giọng nói
 
   // 🌐 QUẢN LÝ DỊCH TIN NHẮN (MỚI THÊM)
   const [translatedMessages, setTranslatedMessages] = useState({});
@@ -599,7 +604,7 @@ export default function Home() {
   };
 
   // ==========================================
-  // 🎤 CÁC HÀM XỬ LÝ GHI ÂM VOICEMAIL & DỊCH WHISPER
+  // 🎤 CÁC HÀM XỬ LÝ GHI ÂM CHUẨN ZALO & DỊCH WHISPER
   // ==========================================
   const startRecording = async () => {
     try {
@@ -612,15 +617,34 @@ export default function Home() {
         if (e.data.size > 0) audioChunksRef.current.push(e.data);
       };
 
-      mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        setAudioBlob(blob);
         stream.getTracks().forEach((track) => track.stop()); // Tắt mic an toàn
-        await handleUploadAndSendAudio(audioBlob);
       };
+
+      // Dịch Live để hiện trên bảng Zalo
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        recognitionRef.current = new SpeechRecognition();
+        recognitionRef.current.lang = 'vi-VN';
+        recognitionRef.current.continuous = true;
+        recognitionRef.current.interimResults = true;
+        recognitionRef.current.onresult = (event) => {
+          let currentTranscript = '';
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            currentTranscript += event.results[i][0].transcript;
+          }
+          setAudioText(currentTranscript);
+        };
+        recognitionRef.current.start();
+      }
 
       mediaRecorder.start();
       setIsRecording(true);
       setRecordingTime(0);
+      setAudioText('');
+      setAudioBlob(null);
       recordingTimerRef.current = setInterval(() => setRecordingTime((prev) => prev + 1), 1000);
     } catch (error) {
       alert('Bác phải cấp quyền Micro trên trình duyệt thì mới ghi âm được nhé!');
@@ -628,28 +652,44 @@ export default function Home() {
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop(); // Tự động gọi mediaRecorder.onstop
-      setIsRecording(false);
-      clearInterval(recordingTimerRef.current);
-    }
+    if (mediaRecorderRef.current && isRecording) mediaRecorderRef.current.stop();
+    if (recognitionRef.current) recognitionRef.current.stop();
+    setIsRecording(false);
+    clearInterval(recordingTimerRef.current);
   };
 
-  const cancelRecording = () => {
+  const cancelRecordingLocal = () => {
     if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.onstop = null; // Cắt mạch, không cho gửi
+      mediaRecorderRef.current.onstop = null;
       mediaRecorderRef.current.stop();
       mediaRecorderRef.current.stream.getTracks().forEach((track) => track.stop());
-      setIsRecording(false);
-      clearInterval(recordingTimerRef.current);
-      setRecordingTime(0);
     }
+    if (recognitionRef.current) recognitionRef.current.stop();
+    setIsRecording(false);
+    clearInterval(recordingTimerRef.current);
+    setAudioBlob(null);
+    setAudioText('');
   };
 
-  // ==========================================
-  // 🎤 HÀM GHI ÂM (Đã fix lỗi Cloudinary)
-  // ==========================================
-  const handleUploadAndSendAudio = async (audioBlob) => {
+  const handleSendAudioAsText = () => {
+    if (!audioText.trim() || !activeConversation) return;
+    socketRef.current.emit('send_message', {
+      conversationId: activeConversation._id,
+      senderId: currentUser.id,
+      text: audioText,
+      messageType: 'text',
+      mediaUrl: '',
+      replyTo: getReplyData(),
+    });
+    setAudioBlob(null);
+    setAudioText('');
+    setShowAudioRecorder(false);
+    setReplyingTo(null);
+  };
+
+  // 🔥 GIỮ NGUYÊN CHÍNH XÁC LOGIC CLOUDINARY + WHISPER CỦA BÁC
+  const handleUploadAndSendAudio = async () => {
+    if (!audioBlob) return;
     setIsUploading(true);
     try {
       // 1. UPLOAD FILE ÂM THANH LÊN CLOUDINARY
@@ -663,10 +703,10 @@ export default function Home() {
       cloudinaryFormData.append('api_key', api_key);
       cloudinaryFormData.append('timestamp', timestamp);
       cloudinaryFormData.append('signature', signature);
-      // 🔥 FIX LỖI Ở ĐÂY: Phải để là 'chat_images' để khớp với chữ ký Server cấp
+      // 🔥 Giữ nguyên theo ý bác: folder 'chat_images'
       cloudinaryFormData.append('folder', 'chat_images');
 
-      // 🔥 FIX LỖI Ở ĐÂY: Dùng 'auto/upload' để Cloudinary tự nhận diện đuôi âm thanh
+      // 🔥 Giữ nguyên theo ý bác: auto/upload
       const uploadRes = await axios.post(
         `https://api.cloudinary.com/v1_1/${cloud_name}/auto/upload`,
         cloudinaryFormData
@@ -698,9 +738,12 @@ export default function Home() {
         mediaUrl: uploadedAudioUrl,
         replyTo: getReplyData(),
       });
+
+      setAudioBlob(null);
+      setAudioText('');
+      setShowAudioRecorder(false);
       setReplyingTo(null);
     } catch (error) {
-      // In lỗi ra Console để nếu hỏng nữa mình biết ngay bệnh gì
       console.error('LỖI GHI ÂM CHI TIẾT:', error.response?.data || error.message);
       alert('Gửi ghi âm thất bại!');
     } finally {
@@ -1962,9 +2005,9 @@ export default function Home() {
                   className='relative flex w-full shrink-0 items-center gap-1.5 p-2 px-2 sm:gap-2 sm:p-3 sm:px-4'
                   onClick={(e) => e.stopPropagation()}
                 >
-                  {/* CỤM 4 NÚT TIỆN ÍCH (File, Ảnh, Nhãn Dán, Ghi âm) */}
+                  {/* CỤM 4 NÚT TIỆN ÍCH */}
                   <div
-                    className={`shrink-0 items-center gap-1.5 transition-all sm:gap-2 ${inputText.trim() || isRecording ? 'hidden sm:flex' : 'flex'}`}
+                    className={`shrink-0 items-center gap-1.5 transition-all sm:gap-2 ${inputText.trim() || showAudioRecorder ? 'hidden sm:flex' : 'flex'}`}
                   >
                     <button className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-2xl text-[#0084ff] transition hover:bg-[#3a3b3c]'>
                       ⊕
@@ -1991,99 +2034,128 @@ export default function Home() {
                         setShowStickerPicker(!showStickerPicker);
                         setShowEmojiPicker(false);
                         setShowSettingsMenu(false);
+                        setShowAudioRecorder(false);
                       }}
                       className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[20px] text-[#0084ff] transition hover:bg-[#3a3b3c] ${showStickerPicker ? 'bg-[#3a3b3c]' : ''}`}
                       title='Nhãn dán'
                     >
                       🧸
                     </button>
-                    {!isRecording && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          startRecording();
-                        }}
-                        className='relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[20px] text-[#0084ff] transition hover:bg-[#3a3b3c]'
-                        title='Ghi âm thoại'
-                      >
-                        🎙️
-                      </button>
-                    )}
-                  </div>
-
-                  {/* KHU VỰC CHUYỂN ĐỔI GIỮA ĐANG GHI ÂM VÀ GÕ CHỮ */}
-                  {isRecording ? (
-                    <div className='flex flex-1 items-center justify-between rounded-full border border-[#ff3b30]/30 bg-[#ff3b30]/10 px-4 py-1.5 sm:py-2'>
-                      <div className='flex items-center gap-2'>
-                        <span className='h-2.5 w-2.5 animate-pulse rounded-full bg-[#ff3b30]'></span>
-                        <span className='text-[14px] font-semibold text-[#ff3b30]'>
-                          {Math.floor(recordingTime / 60)}:
-                          {(recordingTime % 60).toString().padStart(2, '0')}
-                        </span>
-                      </div>
-                      <div className='flex items-center gap-3 sm:gap-4'>
-                        <button
-                          onClick={cancelRecording}
-                          className='text-[13px] font-medium text-gray-400 transition hover:text-[#e4e6eb]'
-                        >
-                          Hủy bỏ
-                        </button>
-                        <button
-                          onClick={stopRecording}
-                          className='flex h-8 w-8 items-center justify-center rounded-full bg-[#0084ff] text-white shadow-md transition hover:bg-[#0073e6]'
-                        >
-                          <svg
-                            width='16'
-                            height='16'
-                            viewBox='0 0 24 24'
-                            fill='none'
-                            stroke='currentColor'
-                            strokeWidth='2.5'
-                            strokeLinecap='round'
-                            strokeLinejoin='round'
-                          >
-                            <line x1='12' y1='19' x2='12' y2='5'></line>
-                            <polyline points='5 12 12 5 19 12'></polyline>
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className='relative flex min-w-0 flex-1 items-center rounded-full bg-[#3a3b3c] pr-1 pl-3'>
-                      <input
-                        ref={inputRef}
-                        type='text'
-                        value={inputText}
-                        onChange={handleTyping}
-                        onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                        placeholder='Aa'
-                        className='min-w-0 flex-1 bg-transparent py-2.5 text-[15px] outline-none'
-                      />
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setShowEmojiPicker(!showEmojiPicker);
-                          setShowStickerPicker(false);
-                          setShowSettingsMenu(false);
-                        }}
-                        className='ml-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xl text-[#0084ff] transition hover:bg-[#4e4f50]'
-                      >
-                        {defaultEmojiToInput}
-                      </button>
-                    </div>
-                  )}
-
-                  {/* NÚT GỬI / LIKE */}
-                  {!isRecording && (
+                    {/* NÚT BẬT BẢNG GHI ÂM ZALO */}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        inputText.trim() ? handleSendMessage() : handleSendLike();
+                        setShowAudioRecorder(!showAudioRecorder);
+                        setShowStickerPicker(false);
+                        setShowEmojiPicker(false);
+                        setShowSettingsMenu(false);
                       }}
-                      className='flex h-10 min-w-[40px] shrink-0 items-center justify-center rounded-full px-2 text-[16px] font-bold text-[#0084ff] transition hover:bg-[#3a3b3c]'
+                      className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[20px] text-[#0084ff] transition hover:bg-[#3a3b3c] ${showAudioRecorder ? 'bg-[#3a3b3c]' : ''}`}
+                      title='Ghi âm thoại'
                     >
-                      {inputText.trim() ? 'Gửi' : '👍'}
+                      🎙️
                     </button>
+                  </div>
+
+                  {/* KHU VỰC GÕ CHỮ */}
+                  <div className='relative flex min-w-0 flex-1 items-center rounded-full bg-[#3a3b3c] pr-1 pl-3'>
+                    <input
+                      ref={inputRef}
+                      type='text'
+                      value={inputText}
+                      onChange={handleTyping}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                      placeholder='Aa'
+                      className='min-w-0 flex-1 bg-transparent py-2.5 text-[15px] outline-none'
+                    />
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowEmojiPicker(!showEmojiPicker);
+                        setShowStickerPicker(false);
+                        setShowAudioRecorder(false);
+                        setShowSettingsMenu(false);
+                      }}
+                      className='ml-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xl text-[#0084ff] transition hover:bg-[#4e4f50]'
+                    >
+                      {defaultEmojiToInput}
+                    </button>
+                  </div>
+
+                  {/* NÚT GỬI / LIKE */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      inputText.trim() ? handleSendMessage() : handleSendLike();
+                    }}
+                    className='flex h-10 min-w-[40px] shrink-0 items-center justify-center rounded-full px-2 text-[16px] font-bold text-[#0084ff] transition hover:bg-[#3a3b3c]'
+                  >
+                    {inputText.trim() ? 'Gửi' : '👍'}
+                  </button>
+
+                  {/* --- 🔥 BẢNG HIỂN THỊ GHI ÂM (CHUẨN ZALO) 🔥 --- */}
+                  {showAudioRecorder && (
+                    <div className='absolute right-0 bottom-16 left-0 z-50 mx-auto flex w-[90%] max-w-[340px] flex-col items-center justify-center overflow-hidden rounded-2xl border border-gray-700 bg-[#242526] p-5 shadow-2xl sm:right-auto sm:left-16 sm:mx-0'>
+                      {/* Vùng hiển thị thời gian / Chữ dịch được */}
+                      <div className='mb-6 flex min-h-[60px] w-full flex-col items-center justify-center text-center'>
+                        {isRecording ? (
+                          <div className='flex items-center gap-2'>
+                            <span className='h-3 w-3 animate-pulse rounded-full bg-red-500'></span>
+                            <span className='font-mono text-3xl text-[#0084ff]'>
+                              {Math.floor(recordingTime / 60)
+                                .toString()
+                                .padStart(2, '0')}
+                              :{(recordingTime % 60).toString().padStart(2, '0')}
+                            </span>
+                          </div>
+                        ) : audioText ? (
+                          <p className='text-[15px] text-[#e4e6eb] italic'>"{audioText}"</p>
+                        ) : (
+                          <p className='text-[14px] text-[#b0b3b8]'>Bấm hoặc bấm giữ để ghi âm</p>
+                        )}
+                      </div>
+
+                      {/* Nút Micro Bự / Nút Dừng */}
+                      {!audioBlob && (
+                        <button
+                          onMouseDown={startRecording}
+                          onMouseUp={stopRecording}
+                          onTouchStart={startRecording}
+                          onTouchEnd={stopRecording}
+                          className={`flex h-20 w-20 items-center justify-center rounded-full text-4xl text-white shadow-[0_0_20px_rgba(0,132,255,0.4)] transition-all ${isRecording ? 'scale-110 bg-red-500' : 'bg-[#0084ff] hover:scale-105'}`}
+                        >
+                          {isRecording ? '⏹' : '🎤'}
+                        </button>
+                      )}
+
+                      {/* 2 Nút Gửi (Audio & Text) khi đã ghi xong */}
+                      {audioBlob && !isRecording && (
+                        <div className='mt-2 flex w-full gap-2'>
+                          <button
+                            onClick={handleUploadAndSendAudio}
+                            className='flex-1 rounded-full bg-[#0084ff] py-2.5 text-[13px] font-semibold text-white transition hover:bg-[#0073e6]'
+                          >
+                            Gửi bản ghi âm
+                          </button>
+                          <button
+                            onClick={handleSendAudioAsText}
+                            className='flex-1 rounded-full bg-[#3a3b3c] py-2.5 text-[13px] font-semibold text-[#e4e6eb] transition hover:bg-[#4e4f50]'
+                          >
+                            Gửi dạng văn bản
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Nút Hủy */}
+                      {(audioBlob || isRecording) && (
+                        <button
+                          onClick={cancelRecordingLocal}
+                          className='mt-4 text-[13px] font-medium text-red-500 underline transition hover:text-red-400'
+                        >
+                          Hủy bỏ
+                        </button>
+                      )}
+                    </div>
                   )}
 
                   {/* --- Bảng hiển thị Nhãn Dán (Stickers Picker) --- */}
