@@ -123,6 +123,16 @@ export default function Home() {
   const [selectedMembers, setSelectedMembers] = useState([]);
   const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
 
+  // 🔥 QUẢN LÝ GIAO DIỆN THÔNG BÁO & ĐỔI TÊN MỚI
+  const [toast, setToast] = useState(null);
+  const [showChangeNameModal, setShowChangeNameModal] = useState(false);
+  const [newNameInput, setNewNameInput] = useState('');
+
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
   const [mobileMenuMsg, setMobileMenuMsg] = useState(null);
   const pressTimerRef = useRef(null);
   const [translatedMessages, setTranslatedMessages] = useState({});
@@ -489,24 +499,29 @@ export default function Home() {
     }
   };
 
-  const handleChangeName = async () => {
-    const newName = prompt('Nhập tên người dùng mới:', currentUser?.name);
-    if (newName === null) return;
-    if (!newName.trim() || newName.trim() === currentUser?.name)
-      return alert('Vui lòng nhập tên mới!');
+  const handleOpenChangeName = () => {
+    setNewNameInput(currentUser?.name || '');
+    setShowChangeNameModal(true);
+    setShowSettingsMenu(false);
+  };
+
+  const submitChangeName = async () => {
+    if (!newNameInput.trim() || newNameInput.trim() === currentUser?.name) {
+      showToast('Vui lòng nhập tên mới khác tên hiện tại!', 'error');
+      return;
+    }
     try {
       const response = await axios.put(
         `https://hookchat-e6ad.onrender.com/api/chat/users/${currentUser.id}/name`,
-        { name: newName.trim() }
+        { name: newNameInput.trim() }
       );
       const updatedUser = { ...currentUser, name: response.data.name };
       setCurrentUser(updatedUser);
       localStorage.setItem('user', JSON.stringify(updatedUser));
-      alert('Đổi tên người dùng thành công! 🎉');
+      showToast('Đổi tên hiển thị thành công!', 'success');
+      setShowChangeNameModal(false);
     } catch (error) {
-      alert('Đổi tên thất bại, vui lòng thử lại!');
-    } finally {
-      setShowSettingsMenu(false);
+      showToast('Đổi tên thất bại, vui lòng thử lại!', 'error');
     }
   };
 
@@ -835,6 +850,86 @@ export default function Home() {
 
   return (
     <div className='dark'>
+      {/* --- 🔥 TOAST THÔNG BÁO NỔI GÓC PHẢI TRÊN 🔥 --- */}
+      {toast && (
+        <div className='animate-in slide-in-from-right-8 fade-in fixed top-6 right-4 z-[9999] flex duration-300'>
+          <div className='flex items-center gap-3 rounded-xl border border-gray-700 bg-[#242526] px-4 py-3 shadow-[0_10px_30px_rgba(0,0,0,0.5)]'>
+            {toast.type === 'success' ? (
+              <div className='flex h-8 w-8 items-center justify-center rounded-full bg-green-500/20 text-green-500'>
+                <svg
+                  className='h-5 w-5'
+                  fill='none'
+                  viewBox='0 0 24 24'
+                  stroke='currentColor'
+                  strokeWidth={3}
+                >
+                  <path strokeLinecap='round' strokeLinejoin='round' d='M5 13l4 4L19 7' />
+                </svg>
+              </div>
+            ) : (
+              <div className='flex h-8 w-8 items-center justify-center rounded-full bg-red-500/20 text-red-500'>
+                <svg
+                  className='h-5 w-5'
+                  fill='none'
+                  viewBox='0 0 24 24'
+                  stroke='currentColor'
+                  strokeWidth={3}
+                >
+                  <path strokeLinecap='round' strokeLinejoin='round' d='M6 18L18 6M6 6l12 12' />
+                </svg>
+              </div>
+            )}
+            <span className='text-[14px] font-medium text-[#e4e6eb]'>{toast.message}</span>
+          </div>
+        </div>
+      )}
+
+      {/* --- 🔥 MODAL ĐỔI TÊN NGƯỜI DÙNG 🔥 --- */}
+      {showChangeNameModal && (
+        <div className='absolute inset-0 z-[500] flex items-center justify-center bg-black/60 backdrop-blur-sm transition-opacity'>
+          <div
+            className='animate-in zoom-in-95 flex w-[380px] flex-col overflow-hidden rounded-2xl border border-gray-700 bg-[#242526] shadow-2xl'
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className='relative flex items-center justify-center border-b border-gray-700 p-4'>
+              <h2 className='text-[18px] font-bold text-[#e4e6eb]'>Đổi tên hiển thị</h2>
+              <button
+                onClick={() => setShowChangeNameModal(false)}
+                className='absolute right-4 flex h-8 w-8 items-center justify-center rounded-full bg-[#3a3b3c] text-[#b0b3b8] transition hover:bg-[#4e4f50] hover:text-white'
+              >
+                ✕
+              </button>
+            </div>
+            <div className='p-5'>
+              <p className='mb-3 text-[14px] text-[#b0b3b8]'>
+                Tên này sẽ hiển thị với bạn bè của bạn trong các cuộc trò chuyện.
+              </p>
+              <input
+                type='text'
+                value={newNameInput}
+                onChange={(e) => setNewNameInput(e.target.value)}
+                placeholder='Nhập tên mới...'
+                autoFocus
+                className='w-full rounded-xl bg-[#3a3b3c] p-3 text-[15px] text-[#e4e6eb] outline-none focus:ring-2 focus:ring-[#0084ff]'
+              />
+            </div>
+            <div className='flex justify-end gap-3 border-t border-gray-700 bg-[#242526] p-4'>
+              <button
+                onClick={() => setShowChangeNameModal(false)}
+                className='rounded-xl px-5 py-2 font-semibold text-[#b0b3b8] transition hover:bg-[#3a3b3c]'
+              >
+                Hủy
+              </button>
+              <button
+                onClick={submitChangeName}
+                className='rounded-xl bg-[#0084ff] px-6 py-2 font-semibold text-white shadow-md transition hover:bg-[#0073e6]'
+              >
+                Lưu thay đổi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div
         className='relative flex h-[100dvh] w-full flex-col overflow-hidden bg-[#242526] font-sans text-[#e4e6eb] md:flex-row'
         onClick={() => {
@@ -2301,7 +2396,7 @@ export default function Home() {
                   <span>{isUpdatingAvatar ? '⏳ Đang tải ảnh lên...' : '🖼️ Đổi ảnh đại diện'}</span>
                 </div>
                 <div
-                  onClick={handleChangeName}
+                  onClick={handleOpenChangeName}
                   className='cursor-pointer px-4 py-2 text-[#e4e6eb] transition hover:bg-[#3a3b3c]'
                 >
                   Chỉnh sửa tên người dùng
