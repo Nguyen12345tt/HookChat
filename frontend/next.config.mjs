@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  /* config options here */
+  transpilePackages: ['emoji-picker-react', 'socket.io-client', 'engine.io-client'],
 };
 
 export default nextConfig;
