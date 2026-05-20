@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef, use } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { io } from 'socket.io-client'; // 🔥 THÊM IMPORT SOCKET VÀO ĐÂY
+import { io } from 'socket.io-client';
 
 export default function CallPage({ params }) {
   const containerRef = useRef(null);
@@ -35,7 +35,7 @@ export default function CallPage({ params }) {
         const appID = 2003933466;
         const serverSecret = process.env.NEXT_PUBLIC_ZEGO_SECRET;
 
-        // Tự tạo Token ngay tại máy tính trình duyệt (Không cần Backend nữa)
+        // Tự tạo Token ngay tại máy tính trình duyệt
         const kitToken = ZegoUIKitPrebuilt.generateKitTokenForTest(
           appID,
           serverSecret,
@@ -57,43 +57,70 @@ export default function CallPage({ params }) {
           scenario: { mode: ZegoUIKitPrebuilt.OneONoneCall },
           turnOnCameraWhenJoining: isVideoCall,
           showPreJoinView: false,
+
+          // 🔥 TÍNH NĂNG 1: TỰ ĐỘNG THOÁT KHI NGƯỜI KIA CÚP MÁY
+          onUserLeave: (users) => {
+            if (zegoInstanceRef.current && zegoInstanceRef.current !== 'LOADING') {
+              try {
+                zegoInstanceRef.current.destroy();
+              } catch (e) {}
+            }
+            window.location.href = '/';
+          },
+
+          // 🔥 TÍNH NĂNG 2 & 3: LƯU THỜI GIAN CHUẨN VÀ ÉP CHỜ SOCKET KẾT NỐI
           onLeaveRoom: () => {
-            // 1. TÍNH TOÁN THỜI GIAN GỌI
             const durationInSeconds = Math.floor((Date.now() - startTime) / 1000);
             let textLog = '';
 
-            // Nếu thoát quá nhanh (< 2s) => Hủy cuộc gọi. Nếu không thì tính phút/giây.
+            // Nếu gọi dưới 2 giây thì coi như Hủy
             if (durationInSeconds < 2) {
               textLog = 'canceled';
             } else {
-              const minutes = Math.floor(durationInSeconds / 60);
+              // Tính Giờ - Phút - Giây
+              const hours = Math.floor(durationInSeconds / 3600);
+              const minutes = Math.floor((durationInSeconds % 3600) / 60);
               const seconds = durationInSeconds % 60;
-              textLog = `${minutes} phút ${seconds} giây`;
+
+              if (hours > 0) {
+                textLog = `${hours} giờ ${minutes} phút ${seconds} giây`;
+              } else {
+                textLog = `${minutes} phút ${seconds} giây`;
+              }
             }
 
-            // 2. KẾT NỐI SOCKET TẠM THỜI ĐỂ GỬI BÁO CÁO VỀ PHÒNG CHAT
+            // Mở Socket kết nối lên Server
             const tempSocket = io('https://hookchat-e6ad.onrender.com');
-            tempSocket.emit('send_message', {
-              conversationId: roomID,
-              senderId: currentUser._id || currentUser.id, // ID của người đang gọi
-              text: textLog,
-              messageType: 'call',
-              mediaUrl: '',
+
+            // BẮT BUỘC ĐỢI CONNECT XONG MỚI GỬI
+            tempSocket.on('connect', () => {
+              tempSocket.emit('send_message', {
+                conversationId: roomID,
+                senderId: currentUser._id || currentUser.id,
+                text: textLog,
+                messageType: 'call',
+                mediaUrl: '',
+              });
+
+              // Đợi thêm 500ms cho tin nhắn vào DB rồi mới về bờ
+              setTimeout(() => {
+                tempSocket.disconnect();
+                window.location.href = '/';
+              }, 500);
             });
 
-            // 3. DỌN DẸP ZEGOCLOUD ĐỂ KHÔNG BỊ TREO CAMERA
+            // Dự phòng: Mạng lag không connect được trong 2.5s thì vẫn ép thoát để không bị treo đen xì
+            setTimeout(() => {
+              window.location.href = '/';
+            }, 2500);
+
+            // DỌN DẸP ZEGOCLOUD ĐỂ KHÔNG BỊ KẸT CAMERA/MIC TRÊN ĐIỆN THOẠI
             if (zegoInstanceRef.current && zegoInstanceRef.current !== 'LOADING') {
               try {
                 zegoInstanceRef.current.destroy();
               } catch (e) {}
             }
             zegoInstanceRef.current = null;
-
-            // 4. CHỜ NỬA GIÂY CHO TIN NHẮN BAY ĐI RỒI MỚI VỀ TRANG CHỦ
-            setTimeout(() => {
-              tempSocket.disconnect();
-              window.location.href = '/'; // Chuyển trang cứng để reset state hoàn toàn
-            }, 500);
           },
         });
       } catch (error) {
