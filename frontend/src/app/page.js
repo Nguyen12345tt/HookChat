@@ -1,5 +1,5 @@
 'use client';
-import EmojiPicker from 'emoji-picker-react';
+import dynamic from 'next/dynamic';
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { io } from 'socket.io-client';
@@ -8,6 +8,11 @@ import axios from 'axios';
 // ==========================================
 // 📦 DỮ LIỆU TĨNH (Stickers, Avatar mặc định)
 // ==========================================
+const EmojiPicker = dynamic(() => import('emoji-picker-react'), {
+  ssr: false,
+  loading: () => null,
+});
+
 const STICKER_PACKS = [
   {
     id: 'bear',
@@ -805,16 +810,14 @@ export default function Home() {
     return null;
   };
 
-  if (isCheckingAuth)
+  if (isCheckingAuth || !currentUser)
     return (
-      <div className='flex h-[100dvh] flex-col items-center justify-center bg-[#242526] text-[#b0b3b8]'>
+      <div className='flex min-h-screen flex-col items-center justify-center bg-[#242526] text-[#b0b3b8]'>
         <p className='mb-4 animate-pulse'>Đang tải dữ liệu...</p>
-        <button
-          onClick={() => (window.location.href = '/login')}
-          className='rounded-lg bg-[#0084ff] px-5 py-2 font-semibold text-white transition hover:bg-[#0073e6]'
-        >
+
+        <a href='/login' className='rounded-lg bg-[#0084ff] px-5 py-2 font-semibold text-white'>
           Đăng nhập để tiếp tục
-        </button>
+        </a>
       </div>
     );
 
