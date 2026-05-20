@@ -17,13 +17,16 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const mode = params.get('mode');
+    // 🔥 FIX SAFARI 1: Bọc trong kiểm tra window để tránh lỗi Hydration của Next.js
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const mode = params.get('mode');
 
-    if (mode === 'register') {
-      setIsLoginMode(false);
-    } else {
-      setIsLoginMode(true);
+      if (mode === 'register') {
+        setIsLoginMode(false);
+      } else {
+        setIsLoginMode(true);
+      }
     }
   }, []);
 
@@ -58,7 +61,11 @@ export default function Login() {
         setName('');
         setEmail('');
         setPassword('');
-        window.location.href = '/login';
+
+        // 🔥 FIX SAFARI 2: Tự động đổi State về Form Đăng Nhập (không cần tải lại trang)
+        setIsLoginMode(true);
+        // Dùng Next.js Router để xóa chữ ?mode=register trên thanh địa chỉ an toàn
+        router.replace('/login');
       }
     } catch (err) {
       // Bắt lỗi từ Backend trả về (như sai pass, trùng email...)
@@ -159,20 +166,31 @@ export default function Login() {
           </form>
 
           <div className='mt-6 text-center'>
+            {/* 🔥 FIX SAFARI 3: Đổi thẻ <a> thành thẻ <button> chuyển State mượt mà */}
             {isLoginMode ? (
-              <a
-                href='/login?mode=register'
-                className='inline-flex min-h-[44px] items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold text-blue-600 dark:text-blue-400'
+              <button
+                type='button'
+                onClick={() => {
+                  setError(''); // Xóa lỗi cũ nếu có
+                  setIsLoginMode(false);
+                  router.push('/login?mode=register');
+                }}
+                className='inline-flex min-h-[44px] cursor-pointer items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold text-blue-600 transition hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/30'
               >
                 Chưa có tài khoản? Đăng ký ngay
-              </a>
+              </button>
             ) : (
-              <a
-                href='/login'
-                className='inline-flex min-h-[44px] items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold text-blue-600 dark:text-blue-400'
+              <button
+                type='button'
+                onClick={() => {
+                  setError(''); // Xóa lỗi cũ nếu có
+                  setIsLoginMode(true);
+                  router.push('/login');
+                }}
+                className='inline-flex min-h-[44px] cursor-pointer items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold text-blue-600 transition hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/30'
               >
                 Đã có tài khoản? Quay lại Đăng nhập
-              </a>
+              </button>
             )}
           </div>
         </div>
