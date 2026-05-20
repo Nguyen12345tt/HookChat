@@ -122,6 +122,10 @@ export default function Home() {
 
   const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
 
+  // 🔥 THÊM 2 DÒNG NÀY ĐỂ XỬ LÝ NHẤN GIỮ TRÊN MOBILE
+  const [mobileMenuMsg, setMobileMenuMsg] = useState(null);
+  const pressTimerRef = useRef(null);
+
   // ==========================================
   // 3️⃣ CÁC USE_REF (Biến không làm re-render giao diện)
   // ==========================================
@@ -961,6 +965,118 @@ export default function Home() {
           </div>
         )}
 
+        {/* --- 🔥 MODAL 5: MENU TIN NHẮN TRÊN MOBILE (NHẤN GIỮ) 🔥 --- */}
+        {mobileMenuMsg && (
+          <div
+            className='fixed inset-0 z-[300] flex flex-col justify-end bg-black/70 backdrop-blur-sm transition-opacity md:hidden'
+            onClick={() => setMobileMenuMsg(null)}
+            style={{ overscrollBehavior: 'contain' }}
+          >
+            {/* Vùng nổi chứa Emoji thả tim (Giống hệt Messenger) */}
+            <div className='animate-in slide-in-from-bottom-8 mx-4 mb-3 flex justify-between rounded-full bg-[#242526] px-5 py-3.5 shadow-[0_0_30px_rgba(0,0,0,0.6)]'>
+              {['❤️', '😆', '😮', '😢', '😡', '👍'].map((emoji) => (
+                <button
+                  key={emoji}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    socketRef.current.emit('react_message', {
+                      messageId: mobileMenuMsg._id,
+                      userId: currentUser.id,
+                      emoji: emoji,
+                      conversationId: activeConversation._id,
+                    });
+                    setMobileMenuMsg(null);
+                  }}
+                  className='text-[32px] transition-transform active:scale-125'
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+
+            {/* Bảng các nút chức năng (Trả lời, Copy, Ghim, Xóa) nằm sát đáy */}
+            <div
+              className='animate-in slide-in-from-bottom-full flex w-full justify-around rounded-t-3xl bg-[#242526] pt-5 pb-8 shadow-2xl'
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Nút Trả lời */}
+              {mobileMenuMsg.messageType !== 'call' && (
+                <button
+                  onClick={() => {
+                    setReplyingTo(mobileMenuMsg);
+                    setMobileMenuMsg(null);
+                    setTimeout(() => inputRef.current?.focus(), 100);
+                  }}
+                  className='flex flex-col items-center gap-2.5'
+                >
+                  <div className='flex h-[50px] w-[50px] items-center justify-center rounded-full bg-[#3a3b3c] text-xl text-[#e4e6eb] active:bg-[#4e4f50]'>
+                    ↩️
+                  </div>
+                  <span className='text-[13px] font-medium text-[#e4e6eb]'>Trả lời</span>
+                </button>
+              )}
+
+              {/* Nút Sao chép */}
+              {mobileMenuMsg.messageType === 'text' && (
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(mobileMenuMsg.text);
+                    setMobileMenuMsg(null);
+                    alert('Đã sao chép vào khay nhớ tạm!');
+                  }}
+                  className='flex flex-col items-center gap-2.5'
+                >
+                  <div className='flex h-[50px] w-[50px] items-center justify-center rounded-full bg-[#3a3b3c] text-xl text-[#e4e6eb] active:bg-[#4e4f50]'>
+                    📋
+                  </div>
+                  <span className='text-[13px] font-medium text-[#e4e6eb]'>Sao chép</span>
+                </button>
+              )}
+
+              {/* Nút Ghim */}
+              {mobileMenuMsg.messageType !== 'call' && (
+                <button
+                  onClick={() => {
+                    socketRef.current.emit('toggle_pin', {
+                      messageId: mobileMenuMsg._id,
+                      conversationId: activeConversation._id,
+                    });
+                    setMobileMenuMsg(null);
+                  }}
+                  className='flex flex-col items-center gap-2.5'
+                >
+                  <div className='flex h-[50px] w-[50px] items-center justify-center rounded-full bg-[#3a3b3c] text-xl text-[#e4e6eb] active:bg-[#4e4f50]'>
+                    📌
+                  </div>
+                  <span className='text-[13px] font-medium text-[#e4e6eb]'>
+                    {mobileMenuMsg.isPinned ? 'Bỏ ghim' : 'Ghim'}
+                  </span>
+                </button>
+              )}
+
+              {/* Nút Khác (Gỡ/Xóa) */}
+              <button
+                onClick={() => {
+                  setRecallModalData(mobileMenuMsg);
+                  setRecallOption(
+                    mobileMenuMsg.senderId?._id === currentUser.id ||
+                      mobileMenuMsg.senderId === currentUser.id
+                      ? 'everyone'
+                      : 'only_me'
+                  );
+                  setMobileMenuMsg(null);
+                }}
+                className='flex flex-col items-center gap-2.5'
+              >
+                <div className='flex h-[50px] w-[50px] items-center justify-center rounded-full bg-[#3a3b3c] text-[22px] text-[#e4e6eb] active:bg-[#4e4f50]'>
+                  ⋮
+                </div>
+                <span className='text-[13px] font-medium text-[#e4e6eb]'>Khác</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* ==================================================== */}
         {/* 📚 CỘT 1: DANH SÁCH BẠN BÈ & NHÓM CHAT (Đứng giữa màn hình máy tính) */}
         {/* ==================================================== */}
@@ -1237,7 +1353,7 @@ export default function Home() {
 
                     return (
                       <div
-                        className={`flex items-center gap-1 text-[#b0b3b8] transition-opacity ${isMine ? 'mr-2' : 'ml-2'} ${visibilityClass}`}
+                        className={`hidden items-center gap-1 text-[#b0b3b8] transition-opacity md:flex ${isMine ? 'mr-2' : 'ml-2'} ${visibilityClass}`}
                       >
                         {/* 🔥 BƯỚC 2: CHỈ HIỆN NÚT THẢ TIM VÀ TRẢ LỜI NẾU KHÔNG PHẢI LÀ CUỘC GỌI */}
                         {!isCallMsg && (
@@ -1358,6 +1474,12 @@ export default function Home() {
                       key={index}
                       id={`msg-${msg._id}`}
                       className={`flex w-full flex-col rounded-lg p-1 transition-all duration-500 ${msg.isPinned ? 'mt-2 mb-4' : 'mb-1'} ${activeReactionId === msg._id || openMenuId === msg._id ? 'z-20' : 'z-0'}`}
+                      // 🔥 THÊM 3 SỰ KIỆN NÀY ĐỂ BẮT HÀNH ĐỘNG NHẤN GIỮ NỬA GIÂY TRÊN ĐIỆN THOẠI
+                      onTouchStart={() => {
+                        pressTimerRef.current = setTimeout(() => setMobileMenuMsg(msg), 500);
+                      }}
+                      onTouchEnd={() => clearTimeout(pressTimerRef.current)}
+                      onTouchMove={() => clearTimeout(pressTimerRef.current)}
                     >
                       {msg.isPinned && (
                         <div
