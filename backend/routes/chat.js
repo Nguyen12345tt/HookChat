@@ -119,10 +119,9 @@ router.post("/conversation/group", async (req, res) => {
       admins: [creatorId],
     });
     await newGroup.save();
-    const populatedGroup = await Conversation.findById(newGroup._id).populate(
-      "participants",
-      "name avatar",
-    );
+    const populatedGroup = await Conversation.findById(newGroup._id)
+      .populate("participants", "name avatar")
+      .populate("admins", "name avatar");
     res.status(201).json(populatedGroup);
   } catch (error) {
     res.status(500).json({ message: "Lỗi" });
@@ -173,11 +172,9 @@ router.post("/group/remove-member", async (req, res) => {
         .status(403)
         .json({ message: "Bạn không có quyền xóa thành viên" });
     if (memberId === requesterId)
-      return res
-        .status(400)
-        .json({
-          message: "Bạn không thể tự xóa mình, hãy dùng chức năng rời nhóm",
-        });
+      return res.status(400).json({
+        message: "Bạn không thể tự xóa mình, hãy dùng chức năng rời nhóm",
+      });
     conversation.participants = conversation.participants.filter(
       (id) => id.toString() !== memberId,
     );
@@ -202,12 +199,9 @@ router.post("/group/leave", async (req, res) => {
       return res.status(400).json({ message: "Bạn không ở trong nhóm này" });
     // Nếu là chủ nhóm thì không cho rời mà phải giải tán hoặc chuyển quyền
     if (conversation.admins[0].toString() === userId) {
-      return res
-        .status(400)
-        .json({
-          message:
-            "Chủ nhóm không thể rời nhóm, hãy giải tán hoặc chuyển quyền",
-        });
+      return res.status(400).json({
+        message: "Chủ nhóm không thể rời nhóm, hãy giải tán hoặc chuyển quyền",
+      });
     }
     conversation.participants = conversation.participants.filter(
       (id) => id.toString() !== userId,
@@ -265,6 +259,7 @@ router.get("/conversations/user/:userId", async (req, res) => {
       participants: req.params.userId,
     })
       .populate("participants", "name avatar")
+      .populate("admins", "name avatar") // ← THÊM DÒNG NÀY
       .populate("latestMessage")
       .sort({ updatedAt: -1 });
     res.json(conversations);
