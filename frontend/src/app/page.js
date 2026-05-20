@@ -646,10 +646,13 @@ export default function Home() {
     }
   };
 
+  // ==========================================
+  // 🎤 HÀM GHI ÂM (Đã fix lỗi Cloudinary)
+  // ==========================================
   const handleUploadAndSendAudio = async (audioBlob) => {
     setIsUploading(true);
     try {
-      // 1. UPLOAD FILE ÂM THANH LÊN CLOUDINARY (Để giảm tải cho Backend)
+      // 1. UPLOAD FILE ÂM THANH LÊN CLOUDINARY
       const sigResponse = await axios.get(
         'https://hookchat-e6ad.onrender.com/api/chat/upload-signature'
       );
@@ -660,10 +663,12 @@ export default function Home() {
       cloudinaryFormData.append('api_key', api_key);
       cloudinaryFormData.append('timestamp', timestamp);
       cloudinaryFormData.append('signature', signature);
-      cloudinaryFormData.append('folder', 'chat_audio');
+      // 🔥 FIX LỖI Ở ĐÂY: Phải để là 'chat_images' để khớp với chữ ký Server cấp
+      cloudinaryFormData.append('folder', 'chat_images');
 
+      // 🔥 FIX LỖI Ở ĐÂY: Dùng 'auto/upload' để Cloudinary tự nhận diện đuôi âm thanh
       const uploadRes = await axios.post(
-        `https://api.cloudinary.com/v1_1/${cloud_name}/video/upload`,
+        `https://api.cloudinary.com/v1_1/${cloud_name}/auto/upload`,
         cloudinaryFormData
       );
       const uploadedAudioUrl = uploadRes.data.secure_url;
@@ -681,20 +686,22 @@ export default function Home() {
           transcribedText = `🎤 ${whisperRes.data.text}`; // Dán kết quả vào chữ
         }
       } catch (err) {
-        console.log('Không thể bóc băng, dùng chữ mặc định');
+        console.log('Không thể bóc băng, dùng chữ mặc định', err);
       }
 
       // 3. GỬI TIN NHẮN LÊN SOCKET
       socketRef.current.emit('send_message', {
         conversationId: activeConversation._id,
         senderId: currentUser.id,
-        text: transcribedText, // Gửi kèm đoạn text đã được AI nghe và viết ra
+        text: transcribedText,
         messageType: 'audio',
         mediaUrl: uploadedAudioUrl,
         replyTo: getReplyData(),
       });
       setReplyingTo(null);
     } catch (error) {
+      // In lỗi ra Console để nếu hỏng nữa mình biết ngay bệnh gì
+      console.error('LỖI GHI ÂM CHI TIẾT:', error.response?.data || error.message);
       alert('Gửi ghi âm thất bại!');
     } finally {
       setIsUploading(false);
