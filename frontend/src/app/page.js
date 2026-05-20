@@ -146,6 +146,12 @@ export default function Home() {
   const [audioText, setAudioText] = useState('');
   const [audioMode, setAudioMode] = useState('audio'); // 'audio' | 'text'
 
+  // Quản lý nhóm
+  const [showGroupSettingsModal, setShowGroupSettingsModal] = useState(false);
+  const [groupMembersList, setGroupMembersList] = useState([]);
+  const [selectedNewMembers, setSelectedNewMembers] = useState([]);
+  const [isProcessingGroup, setIsProcessingGroup] = useState(false);
+
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const recordingTimerRef = useRef(null);
@@ -338,6 +344,134 @@ export default function Home() {
         partnerAvatar = partner.avatar;
       }
     }
+
+    // Lấy danh sách thành viên chi tiết (từ activeConversation.participants)
+    const fetchGroupMembersDetail = () => {
+      if (!activeConversation?.isGroup) return;
+      setGroupMembersList(activeConversation.participants || []);
+    };
+
+    // Thêm thành viên
+    const handleAddMembers = async () => {
+      if (!activeConversation || selectedNewMembers.length === 0) return;
+      setIsProcessingGroup(true);
+      try {
+        await axios.post(`https://hookchat-e6ad.onrender.com/api/chat/group/add-members`, {
+          groupId: activeConversation._id,
+          userIds: selectedNewMembers,
+          requesterId: currentUser.id,
+        });
+        // Refresh conversations
+        const res = await axios.get(
+          `https://hookchat-e6ad.onrender.com/api/chat/conversations/user/${currentUser.id}`
+        );
+        setConversations(res.data);
+        const updatedConv = res.data.find((c) => c._id === activeConversation._id);
+        if (updatedConv) setActiveConversation(updatedConv);
+        setSelectedNewMembers([]);
+        showToast('Đã thêm thành viên!', 'success');
+      } catch (error) {
+        showToast('Thêm thất bại!', 'error');
+      } finally {
+        setIsProcessingGroup(false);
+      }
+    };
+
+    // Kick thành viên (chỉ chủ nhóm)
+    const handleKickMember = async (memberId) => {
+      if (!confirm('Bạn có chắc muốn xóa thành viên này khỏi nhóm?')) return;
+      setIsProcessingGroup(true);
+      try {
+        await axios.post(`https://hookchat-e6ad.onrender.com/api/chat/group/remove-member`, {
+          groupId: activeConversation._id,
+          memberId: memberId,
+          requesterId: currentUser.id,
+        });
+        const res = await axios.get(
+          `https://hookchat-e6ad.onrender.com/api/chat/conversations/user/${currentUser.id}`
+        );
+        setConversations(res.data);
+        const updatedConv = res.data.find((c) => c._id === activeConversation._id);
+        if (updatedConv) setActiveConversation(updatedConv);
+        showToast('Đã xóa thành viên', 'success');
+      } catch (error) {
+        showToast('Xóa thất bại', 'error');
+      } finally {
+        setIsProcessingGroup(false);
+      }
+    };
+
+    // Rời nhóm (thành viên thường)
+    const handleLeaveGroup = async () => {
+      if (!confirm('Bạn có chắc muốn rời khỏi nhóm này?')) return;
+      setIsProcessingGroup(true);
+      try {
+        await axios.post(`https://hookchat-e6ad.onrender.com/api/chat/group/leave`, {
+          groupId: activeConversation._id,
+          userId: currentUser.id,
+        });
+        // Reload conversations và đóng chat
+        const res = await axios.get(
+          `https://hookchat-e6ad.onrender.com/api/chat/conversations/user/${currentUser.id}`
+        );
+        setConversations(res.data);
+        setActiveConversation(null);
+        showToast('Bạn đã rời nhóm', 'success');
+      } catch (error) {
+        showToast('Rời nhóm thất bại', 'error');
+      } finally {
+        setIsProcessingGroup(false);
+        setShowGroupSettingsModal(false);
+      }
+    };
+
+    // Chuyển quyền nhóm (chủ nhóm)
+    const handleTransferOwnership = async (newOwnerId, newOwnerName) => {
+      if (!confirm(`Bạn có chắc muốn chuyển quyền nhóm cho ${newOwnerName}?`)) return;
+      setIsProcessingGroup(true);
+      try {
+        await axios.post(`https://hookchat-e6ad.onrender.com/api/chat/group/transfer-ownership`, {
+          groupId: activeConversation._id,
+          currentOwnerId: currentUser.id,
+          newOwnerId: newOwnerId,
+        });
+        const res = await axios.get(
+          `https://hookchat-e6ad.onrender.com/api/chat/conversations/user/${currentUser.id}`
+        );
+        setConversations(res.data);
+        const updatedConv = res.data.find((c) => c._id === activeConversation._id);
+        if (updatedConv) setActiveConversation(updatedConv);
+        showToast(`Đã chuyển quyền nhóm cho ${newOwnerName}`, 'success');
+      } catch (error) {
+        showToast('Chuyển quyền thất bại', 'error');
+      } finally {
+        setIsProcessingGroup(false);
+        setShowGroupSettingsModal(false);
+      }
+    };
+
+    // Giải tán nhóm (chủ nhóm)
+    const handleDismissGroup = async () => {
+      if (!confirm('Giải tán nhóm sẽ xóa toàn bộ tin nhắn và thành viên. Bạn chắc chắn?')) return;
+      setIsProcessingGroup(true);
+      try {
+        await axios.post(`https://hookchat-e6ad.onrender.com/api/chat/group/dismiss`, {
+          groupId: activeConversation._id,
+          requesterId: currentUser.id,
+        });
+        const res = await axios.get(
+          `https://hookchat-e6ad.onrender.com/api/chat/conversations/user/${currentUser.id}`
+        );
+        setConversations(res.data);
+        setActiveConversation(null);
+        showToast('Nhóm đã được giải tán', 'success');
+      } catch (error) {
+        showToast('Giải tán thất bại', 'error');
+      } finally {
+        setIsProcessingGroup(false);
+        setShowGroupSettingsModal(false);
+      }
+    };
 
     const callData = {
       callerId: currentUser.id,
@@ -926,6 +1060,150 @@ export default function Home() {
               >
                 Lưu thay đổi
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL QUẢN LÝ NHÓM */}
+      {showGroupSettingsModal && activeConversation?.isGroup && (
+        <div className='absolute inset-0 z-[500] flex items-center justify-center bg-black/60 backdrop-blur-sm transition-opacity'>
+          <div
+            className='animate-in zoom-in-95 flex max-h-[80vh] w-[480px] flex-col overflow-hidden rounded-2xl border border-gray-700 bg-[#242526] shadow-2xl'
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className='relative flex items-center justify-center border-b border-gray-700 p-4'>
+              <h2 className='text-[18px] font-bold text-[#e4e6eb]'>
+                Quản lý nhóm: {activeConversation.groupName || 'Nhóm'}
+              </h2>
+              <button
+                onClick={() => setShowGroupSettingsModal(false)}
+                className='absolute right-4 flex h-8 w-8 items-center justify-center rounded-full bg-[#3a3b3c] text-[#b0b3b8] transition hover:bg-[#4e4f50] hover:text-white'
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className='flex-1 overflow-y-auto p-4'>
+              {/* Thêm thành viên (chỉ chủ nhóm) */}
+              {activeConversation.creator?._id === currentUser.id && (
+                <div className='mb-6'>
+                  <h3 className='mb-2 text-[15px] font-semibold text-[#e4e6eb]'>Thêm thành viên</h3>
+                  <div className='flex flex-wrap gap-2'>
+                    {users
+                      .filter(
+                        (u) => !activeConversation.participants.some((p) => (p._id || p) === u._id)
+                      )
+                      .map((user) => (
+                        <label
+                          key={user._id}
+                          className='flex cursor-pointer items-center gap-2 rounded-full bg-[#3a3b3c] px-3 py-1.5'
+                        >
+                          <input
+                            type='checkbox'
+                            checked={selectedNewMembers.includes(user._id)}
+                            onChange={(e) => {
+                              if (e.target.checked)
+                                setSelectedNewMembers((prev) => [...prev, user._id]);
+                              else
+                                setSelectedNewMembers((prev) =>
+                                  prev.filter((id) => id !== user._id)
+                                );
+                            }}
+                            className='h-4 w-4 accent-[#0084ff]'
+                          />
+                          <span className='text-[13px]'>{user.name}</span>
+                        </label>
+                      ))}
+                    {users.filter(
+                      (u) => !activeConversation.participants.some((p) => (p._id || p) === u._id)
+                    ).length === 0 && (
+                      <p className='text-[13px] text-gray-400'>Không còn bạn bè để thêm</p>
+                    )}
+                  </div>
+                  {selectedNewMembers.length > 0 && (
+                    <button
+                      onClick={handleAddMembers}
+                      disabled={isProcessingGroup}
+                      className='mt-3 rounded-lg bg-[#0084ff] px-4 py-1.5 text-[13px] font-semibold text-white disabled:opacity-50'
+                    >
+                      Thêm {selectedNewMembers.length} người
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Danh sách thành viên */}
+              <h3 className='mb-2 text-[15px] font-semibold text-[#e4e6eb]'>
+                Thành viên ({groupMembersList.length})
+              </h3>
+              <div className='space-y-2'>
+                {groupMembersList.map((member) => {
+                  const memberId = member._id || member;
+                  const memberName = member.name || 'Người dùng';
+                  const memberAvatar = member.avatar || DEFAULT_AVATAR;
+                  const isCreator = activeConversation.creator?._id === memberId;
+                  const isMe = memberId === currentUser.id;
+                  return (
+                    <div
+                      key={memberId}
+                      className='flex items-center justify-between rounded-xl bg-[#3a3b3c]/50 p-2'
+                    >
+                      <div className='flex items-center gap-3'>
+                        <img
+                          src={memberAvatar}
+                          className='h-9 w-9 rounded-full object-cover'
+                          alt=''
+                        />
+                        <div>
+                          <p className='text-[14px] font-medium'>{memberName}</p>
+                          {isCreator && (
+                            <span className='text-[11px] text-[#0084ff]'>Chủ nhóm</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className='flex gap-2'>
+                        {!isCreator && activeConversation.creator?._id === currentUser.id && (
+                          <>
+                            <button
+                              onClick={() => handleTransferOwnership(memberId, memberName)}
+                              className='rounded-md bg-yellow-600 px-2 py-1 text-[12px] font-semibold text-white'
+                            >
+                              Chuyển quyền
+                            </button>
+                            <button
+                              onClick={() => handleKickMember(memberId)}
+                              className='rounded-md bg-red-500 px-2 py-1 text-[12px] font-semibold text-white'
+                            >
+                              Xóa
+                            </button>
+                          </>
+                        )}
+                        {isMe && !isCreator && (
+                          <button
+                            onClick={handleLeaveGroup}
+                            className='rounded-md bg-red-500 px-2 py-1 text-[12px] font-semibold text-white'
+                          >
+                            Rời nhóm
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Nút giải tán (chỉ chủ nhóm) */}
+              {activeConversation.creator?._id === currentUser.id && (
+                <div className='mt-6 border-t border-gray-700 pt-4'>
+                  <button
+                    onClick={handleDismissGroup}
+                    className='w-full rounded-lg bg-red-600 py-2 text-[14px] font-semibold text-white'
+                  >
+                    Giải tán nhóm
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1568,9 +1846,22 @@ export default function Home() {
                       >
                         🎥
                       </button>
-                      <button className='flex h-9 w-9 items-center justify-center rounded-full text-[20px] transition hover:bg-[#3a3b3c]'>
-                        ⋮
-                      </button>
+                      {activeConversation.isGroup ? (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            fetchGroupMembersDetail();
+                            setShowGroupSettingsModal(true);
+                          }}
+                          className='flex h-9 w-9 items-center justify-center rounded-full text-[20px] transition hover:bg-[#3a3b3c]'
+                        >
+                          ⋮
+                        </button>
+                      ) : (
+                        <button className='flex h-9 w-9 items-center justify-center rounded-full text-[20px] transition hover:bg-[#3a3b3c]'>
+                          ⋮
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
