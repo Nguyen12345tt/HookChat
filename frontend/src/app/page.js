@@ -72,7 +72,6 @@ export default function Home() {
         setCurrentUser(JSON.parse(userStr));
         setIsCheckingAuth(false);
       } catch (error) {
-        console.log('Lỗi đọc dữ liệu trên iPhone:', error);
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         setTimeout(() => {
@@ -128,6 +127,11 @@ export default function Home() {
   const [showChangeNameModal, setShowChangeNameModal] = useState(false);
   const [newNameInput, setNewNameInput] = useState('');
 
+  // 🔥 QUẢN LÝ MENU HEADER & TÍNH NĂNG CHẶN/XÓA
+  const [showChatHeaderMenu, setShowChatHeaderMenu] = useState(false);
+  const [showBlockModal, setShowBlockModal] = useState(false);
+  const [showDeleteChatModal, setShowDeleteChatModal] = useState(false);
+
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
@@ -144,7 +148,7 @@ export default function Home() {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [audioText, setAudioText] = useState('');
-  const [audioMode, setAudioMode] = useState('audio'); // 'audio' | 'text'
+  const [audioMode, setAudioMode] = useState('audio');
 
   // Quản lý nhóm
   const [showGroupSettingsModal, setShowGroupSettingsModal] = useState(false);
@@ -157,8 +161,7 @@ export default function Home() {
   const recordingTimerRef = useRef(null);
   const recognitionRef = useRef(null);
 
-  // Biến bảo vệ thuật toán Nhấn Giữ / Bấm (Không dùng State để tránh bị trễ)
-  const recordModeRef = useRef('IDLE'); // 'IDLE' | 'HOLDING' | 'LOCKED'
+  const recordModeRef = useRef('IDLE');
   const touchStartTimerRef = useRef(0);
   const audioTextRef = useRef('');
   const currentAudioModeRef = useRef('audio');
@@ -216,19 +219,25 @@ export default function Home() {
         const res = await axios.get(
           `https://hookchat-e6ad.onrender.com/api/chat/conversations/user/${userId}`
         );
-        setConversations(res.data);
-      } catch (error) {}
+        setConversations(Array.isArray(res.data) ? res.data : []);
+      } catch (error) {
+        setConversations([]);
+      }
     };
 
     socketRef.current = io('https://hookchat-e6ad.onrender.com');
     socketRef.current.emit('user_connected', currentUser.id);
 
-    socketRef.current.on('get_online_users', (users) => setOnlineUsers(users));
+    socketRef.current.on('get_online_users', (users) => {
+      setOnlineUsers(Array.isArray(users) ? users : []);
+    });
 
     socketRef.current.on('receive_message', (newMsg) => {
+      if (!newMsg) return;
       setMessages((prev) => {
-        if (prev.find((m) => m._id === newMsg._id)) return prev;
-        return [...prev, newMsg];
+        const safePrev = Array.isArray(prev) ? prev : [];
+        if (safePrev.find((m) => m._id === newMsg._id)) return safePrev;
+        return [...safePrev, newMsg];
       });
       fetchConversationsSafe(currentUser.id);
 
@@ -247,39 +256,52 @@ export default function Home() {
     });
 
     socketRef.current.on('messages_read', ({ conversationId }) => {
-      setMessages((prev) => prev.map((msg) => ({ ...msg, isRead: true })));
+      setMessages((prev) =>
+        Array.isArray(prev) ? prev.map((msg) => ({ ...msg, isRead: true })) : []
+      );
     });
 
     socketRef.current.on('update_message', (updatedMsg) => {
-      setMessages((prev) => prev.map((m) => (m._id === updatedMsg._id ? updatedMsg : m)));
+      if (!updatedMsg) return;
+      setMessages((prev) =>
+        Array.isArray(prev) ? prev.map((m) => (m._id === updatedMsg._id ? updatedMsg : m)) : []
+      );
     });
 
     socketRef.current.on('message_recalled', ({ messageId }) => {
       setMessages((prev) =>
-        prev.map((msg) =>
-          msg._id === messageId
-            ? {
-                ...msg,
-                isRecalled: true,
-                text: 'Bạn đã thu hồi tin nhắn',
-                mediaUrl: '',
-                messageType: 'text',
-              }
-            : msg
-        )
+        Array.isArray(prev)
+          ? prev.map((msg) =>
+              msg._id === messageId
+                ? {
+                    ...msg,
+                    isRecalled: true,
+                    text: 'Bạn đã thu hồi tin nhắn',
+                    mediaUrl: '',
+                    messageType: 'text',
+                  }
+                : msg
+            )
+          : []
       );
       fetchConversationsSafe(currentUser.id);
     });
 
     socketRef.current.on('user_typing', (data) => {
-      if (data.senderId !== currentUser.id) setIsTyping(true);
+      if (data && data.senderId !== currentUser.id) setIsTyping(true);
     });
     socketRef.current.on('user_stopped_typing', (data) => {
-      if (data.senderId !== currentUser.id) setIsTyping(false);
+      if (data && data.senderId !== currentUser.id) setIsTyping(false);
     });
 
     socketRef.current.on('incoming_call', (callData) => {
-      if (callData.participantIds.includes(currentUser.id)) setIncomingCall(callData);
+      if (
+        callData &&
+        Array.isArray(callData.participantIds) &&
+        callData.participantIds.includes(currentUser.id)
+      ) {
+        setIncomingCall(callData);
+      }
     });
 
     const fetchUsers = async () => {
@@ -287,8 +309,10 @@ export default function Home() {
         const res = await axios.get(
           `https://hookchat-e6ad.onrender.com/api/chat/users/${currentUser.id}`
         );
-        setUsers(res.data);
-      } catch (error) {}
+        setUsers(Array.isArray(res.data) ? res.data : []);
+      } catch (error) {
+        setUsers([]);
+      }
     };
 
     fetchUsers();
@@ -313,7 +337,7 @@ export default function Home() {
       const resMsgs = await axios.get(
         `https://hookchat-e6ad.onrender.com/api/chat/messages/${conv._id}`
       );
-      setMessages(resMsgs.data);
+      setMessages(Array.isArray(resMsgs.data) ? resMsgs.data : []);
 
       socketRef.current.emit('mark_as_read', { conversationId: conv._id, userId: currentUser.id });
 
@@ -321,27 +345,32 @@ export default function Home() {
       setShowStickerPicker(false);
       setShowPinnedModal(false);
       setShowSettingsMenu(false);
-      setShowAudioRecorder(false); // Reset bảng ghi âm khi đổi chat
+      setShowAudioRecorder(false);
+      setShowChatHeaderMenu(false);
       setReplyingTo(null);
       setOpenMenuId(null);
       setActiveReactionId(null);
       setIsTyping(false);
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    } catch (error) {}
+    } catch (error) {
+      showToast('Tải tin nhắn thất bại!', 'error');
+    }
   };
 
   const handleStartCall = (type) => {
     if (!activeConversation) return;
-    const participantIds = activeConversation.participants.map((p) => p._id || p);
+    const participantIds = (activeConversation.participants || []).map((p) => p._id || p);
 
     let partnerName = 'Nhóm';
     let partnerAvatar = DEFAULT_GROUP_AVATAR;
     if (!activeConversation.isGroup) {
-      let partner = activeConversation.participants?.find((p) => (p._id || p) !== currentUser.id);
-      if (!partner) partner = activeConversation.participants?.[0];
+      let partner = (activeConversation.participants || []).find(
+        (p) => (p._id || p) !== currentUser.id
+      );
+      if (!partner && activeConversation.participants) partner = activeConversation.participants[0];
       if (partner) {
-        partnerName = partner.name;
-        partnerAvatar = partner.avatar;
+        partnerName = partner.name || 'Người dùng';
+        partnerAvatar = partner.avatar || DEFAULT_AVATAR;
       }
     }
 
@@ -360,13 +389,41 @@ export default function Home() {
     socketRef.current.emit('initiate_call', callData);
   };
 
-  // Lấy danh sách thành viên chi tiết (từ activeConversation.participants)
+  // 🔥 XỬ LÝ CHẶN VÀ XÓA ĐOẠN CHAT
+  const handleBlockUser = async () => {
+    try {
+      // 🚧 GỌI API CHẶN NGƯỜI DÙNG Ở ĐÂY
+      // await axios.post('/api/chat/users/block', { blockerId: currentUser.id, blockedId: partner._id });
+
+      showToast('Đã chặn người dùng này thành công!', 'success');
+      setShowBlockModal(false);
+      setShowChatHeaderMenu(false);
+      // Có thể cập nhật State để ẩn khung chat
+    } catch (error) {
+      showToast('Lỗi khi chặn người dùng', 'error');
+    }
+  };
+
+  const handleDeleteChat = async () => {
+    try {
+      // 🚧 GỌI API XÓA CUỘC TRÒ CHUYỆN Ở ĐÂY
+      // await axios.delete(`/api/chat/conversations/${activeConversation._id}`);
+
+      showToast('Đã xóa đoạn chat vĩnh viễn', 'success');
+      setConversations((prev) => prev.filter((c) => c._id !== activeConversation._id));
+      setActiveConversation(null);
+      setShowDeleteChatModal(false);
+      setShowChatHeaderMenu(false);
+    } catch (error) {
+      showToast('Lỗi khi xóa đoạn chat', 'error');
+    }
+  };
+
   const fetchGroupMembersDetail = () => {
     if (!activeConversation?.isGroup) return;
     setGroupMembersList(activeConversation.participants || []);
   };
 
-  // Thêm thành viên
   const handleAddMembers = async () => {
     if (!activeConversation || selectedNewMembers.length === 0) return;
     setIsProcessingGroup(true);
@@ -391,7 +448,6 @@ export default function Home() {
     }
   };
 
-  // Kick thành viên (chỉ chủ nhóm)
   const handleKickMember = async (memberId) => {
     if (!confirm('Bạn có chắc muốn xóa thành viên này khỏi nhóm?')) return;
     setIsProcessingGroup(true);
@@ -415,7 +471,6 @@ export default function Home() {
     }
   };
 
-  // Rời nhóm (thành viên thường)
   const handleLeaveGroup = async () => {
     if (!confirm('Bạn có chắc muốn rời khỏi nhóm này?')) return;
     setIsProcessingGroup(true);
@@ -438,7 +493,6 @@ export default function Home() {
     }
   };
 
-  // Chuyển quyền nhóm (chủ nhóm)
   const handleTransferOwnership = async (newOwnerId, newOwnerName) => {
     if (!confirm(`Bạn có chắc muốn chuyển quyền nhóm cho ${newOwnerName}?`)) return;
     setIsProcessingGroup(true);
@@ -463,7 +517,6 @@ export default function Home() {
     }
   };
 
-  // Giải tán nhóm (chủ nhóm)
   const handleDismissGroup = async () => {
     if (!confirm('Giải tán nhóm sẽ xóa toàn bộ tin nhắn và thành viên. Bạn chắc chắn?')) return;
     setIsProcessingGroup(true);
@@ -487,7 +540,10 @@ export default function Home() {
   };
 
   const handleCreateNewChat = async () => {
-    if (selectedMembers.length === 0) return alert('Vui lòng chọn bạn bè!');
+    if (selectedMembers.length === 0) {
+      showToast('Vui lòng chọn bạn bè!', 'error');
+      return;
+    }
     try {
       let resConv;
       if (selectedMembers.length === 1) {
@@ -497,7 +553,10 @@ export default function Home() {
         );
         resConv = res.data;
       } else {
-        if (!newGroupName.trim()) return alert('Vui lòng đặt tên cho nhóm!');
+        if (!newGroupName.trim()) {
+          showToast('Vui lòng đặt tên cho nhóm!', 'error');
+          return;
+        }
         const res = await axios.post(
           'https://hookchat-e6ad.onrender.com/api/chat/conversation/group',
           { creatorId: currentUser.id, groupName: newGroupName, participantIds: selectedMembers }
@@ -508,12 +567,12 @@ export default function Home() {
       const resRefresh = await axios.get(
         `https://hookchat-e6ad.onrender.com/api/chat/conversations/user/${currentUser.id}`
       );
-      setConversations(resRefresh.data);
+      setConversations(Array.isArray(resRefresh.data) ? resRefresh.data : []);
       setShowCreateGroupModal(false);
       setNewGroupName('');
       setSelectedMembers([]);
     } catch (error) {
-      alert('Khởi tạo thất bại, vui lòng thử lại!');
+      showToast('Khởi tạo thất bại, vui lòng thử lại!', 'error');
     }
   };
 
@@ -621,9 +680,9 @@ export default function Home() {
       const updatedUser = { ...currentUser, avatar: newAvatarUrl };
       setCurrentUser(updatedUser);
       localStorage.setItem('user', JSON.stringify(updatedUser));
-      alert('Đổi ảnh đại diện thành công! 🎉');
+      showToast('Đổi ảnh đại diện thành công!', 'success');
     } catch (error) {
-      alert('Đổi ảnh thất bại, thử lại nhé!');
+      showToast('Đổi ảnh thất bại, thử lại nhé!', 'error');
     } finally {
       setIsUpdatingAvatar(false);
       setShowSettingsMenu(false);
@@ -686,7 +745,7 @@ export default function Home() {
       });
       setReplyingTo(null);
     } catch (error) {
-      alert('Up ảnh thất bại!');
+      showToast('Up ảnh thất bại!', 'error');
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -708,32 +767,6 @@ export default function Home() {
   };
 
   const handleTranslate = async (msg) => {
-    // BÓC BĂNG GHI ÂM SAU KHI BẤM NÚT (CHUẨN ZALO)
-    const handleTranscribeAudio = async (msg) => {
-      if (translatedMessages[msg._id]) return; // Nếu dịch rồi thì thôi
-      try {
-        // Mượn tạm State Loading để UX mượt hơn (hoặc bác có thể tự tạo State riêng)
-        setTranslatedMessages((prev) => ({ ...prev, [msg._id]: '⏳ Đang bóc băng...' }));
-
-        const whisperRes = await axios.post(
-          'https://hookchat-e6ad.onrender.com/api/openai/transcribe',
-          {
-            audioUrl: msg.mediaUrl,
-          }
-        );
-
-        if (whisperRes.data.text) {
-          setTranslatedMessages((prev) => ({ ...prev, [msg._id]: whisperRes.data.text }));
-        } else {
-          setTranslatedMessages((prev) => ({
-            ...prev,
-            [msg._id]: 'Không nhận diện được giọng nói.',
-          }));
-        }
-      } catch (error) {
-        setTranslatedMessages((prev) => ({ ...prev, [msg._id]: '❌ Lỗi bóc băng!' }));
-      }
-    };
     if (translatedMessages[msg._id]) return;
     try {
       const response = await axios.post('https://hookchat-e6ad.onrender.com/api/openai/translate', {
@@ -741,42 +774,56 @@ export default function Home() {
       });
       setTranslatedMessages((prev) => ({ ...prev, [msg._id]: response.data.translatedText }));
     } catch (error) {
-      alert('Lỗi kết nối máy chủ dịch thuật!');
+      showToast('Lỗi kết nối máy chủ dịch thuật!', 'error');
     }
   };
 
-  // KHI BẮT ĐẦU CHẠM TAY VÀO NÚT MICRO
+  const handleTranscribeAudio = async (msg) => {
+    if (translatedMessages[msg._id]) return;
+    try {
+      setTranslatedMessages((prev) => ({ ...prev, [msg._id]: '⏳ Đang bóc băng...' }));
+      const whisperRes = await axios.post(
+        'https://hookchat-e6ad.onrender.com/api/openai/transcribe',
+        { audioUrl: msg.mediaUrl }
+      );
+      if (whisperRes.data.text) {
+        setTranslatedMessages((prev) => ({ ...prev, [msg._id]: whisperRes.data.text }));
+      } else {
+        setTranslatedMessages((prev) => ({
+          ...prev,
+          [msg._id]: 'Không nhận diện được giọng nói.',
+        }));
+      }
+    } catch (error) {
+      setTranslatedMessages((prev) => ({ ...prev, [msg._id]: '❌ Lỗi bóc băng!' }));
+    }
+  };
+
   const handlePressStart = (e) => {
+    if (typeof window !== 'undefined' && window.innerWidth > 768) return;
     if (recordModeRef.current === 'LOCKED') {
-      // Nếu nó đang khóa thu âm từ trước, bấm cái nữa là GỬI
       finishAndSendRecording();
       return;
     }
-
     if (recordModeRef.current === 'IDLE') {
       recordModeRef.current = 'HOLDING';
       touchStartTimerRef.current = Date.now();
       currentAudioModeRef.current = audioMode;
-
-      // 🔥 CHỐT CHẶN 1: Dọn sạch mọi bộ đếm cũ ngay khi vừa chạm tay
       clearInterval(recordingTimerRef.current);
       setRecordingTime(0);
-
       startRecording();
     }
   };
 
   const startRecording = async () => {
+    if (isRecording || recordModeRef.current === 'HOLDING') return;
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-
-      // Nếu người dùng đã thả tay ra trước khi lấy được quyền Mic thì hủy luôn
       if (recordModeRef.current === 'IDLE') {
         stream.getTracks().forEach((t) => t.stop());
         return;
       }
-
-      // 🔥 CHỐT CHẶN 2: Ép tắt cái Micro cũ nếu bị lỗi bấm đúp (chạm 2 lần)
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
         mediaRecorderRef.current.stop();
       }
@@ -789,7 +836,6 @@ export default function Home() {
         if (e.data.size > 0) audioChunksRef.current.push(e.data);
       };
 
-      // KHI DỪNG GHI ÂM SẼ TỰ ĐỘNG CHẠY VÀO ĐÂY ĐỂ GỬI LUÔN
       mediaRecorder.onstop = async () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         stream.getTracks().forEach((track) => track.stop());
@@ -797,27 +843,20 @@ export default function Home() {
         let finalText = audioTextRef.current;
         if (recognitionRef.current) recognitionRef.current.stop();
 
-        // 1. Nếu đang chọn Tab "Gửi chữ" (Gửi dạng văn bản)
         if (currentAudioModeRef.current === 'text') {
           if (finalText.trim()) {
-            // 🔥 NÓI XONG -> CHÈN VÀO KHUNG NHẬP CHỮ, KHÔNG GỬI TỰ ĐỘNG!
             setInputText((prev) => (prev ? prev + ' ' + finalText.trim() : finalText.trim()));
-            // Đóng bảng ghi âm để người dùng thấy ô chữ và tự bấm Gửi
             setShowAudioRecorder(false);
             setTimeout(() => inputRef.current?.focus(), 100);
           }
           setAudioText('');
-        }
-        // 2. Nếu đang chọn Tab "Gửi âm thanh"
-        else {
-          // Gửi file ghi âm đi luôn
+        } else {
           await handleUploadAndSendAudio(audioBlob);
           setShowAudioRecorder(false);
           setReplyingTo(null);
         }
       };
 
-      // Bật bộ Dịch Live (Web Speech API)
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (SpeechRecognition) {
         recognitionRef.current = new SpeechRecognition();
@@ -830,60 +869,54 @@ export default function Home() {
             currentTranscript += event.results[i][0].transcript;
           }
           setAudioText(currentTranscript);
-          audioTextRef.current = currentTranscript; // Cập nhật vào Ref để hàm onstop gọi
+          audioTextRef.current = currentTranscript;
         };
+        recognitionRef.current.onerror = () => {};
         recognitionRef.current.start();
       }
 
       mediaRecorder.start();
       setIsRecording(true);
 
-      // 🔥 CHỐT CHẶN 3: Đảm bảo chém đứt bộ đếm lần cuối trước khi tạo cái mới
       clearInterval(recordingTimerRef.current);
       setRecordingTime(0);
       audioTextRef.current = '';
 
-      // Bắt đầu đếm giây
       recordingTimerRef.current = setInterval(() => {
         setRecordingTime((prev) => prev + 1);
       }, 1000);
     } catch (error) {
       recordModeRef.current = 'IDLE';
       setIsRecording(false);
-      alert('Vui lòng cấp quyền Micro trên trình duyệt để ghi âm nhé!');
+      showToast('Vui lòng cấp quyền Micro!', 'error');
     }
   };
 
-  // KHI THẢ TAY RA KHỎI NÚT MICRO
   const handlePressEnd = (e) => {
+    if (typeof window !== 'undefined' && window.innerWidth > 768) return;
     if (recordModeRef.current === 'HOLDING') {
       const duration = Date.now() - touchStartTimerRef.current;
       if (duration < 400) {
-        // Tốc độ nhả tay cực nhanh -> Chuyển sang chế độ Khóa màn hình (Tap Mode)
         recordModeRef.current = 'LOCKED';
-        setRecordingTime((prev) => prev); // Ép render lại giao diện
+        setRecordingTime((prev) => prev);
       } else {
-        // Nhấn giữ đã lâu xong thả ra -> Kết thúc và Gửi luôn
         finishAndSendRecording();
       }
     }
   };
 
-  // HÀM ÉP KẾT THÚC VÀ GỬI (ĐÁNH THỨC SỰ KIỆN onStop Ở TRÊN)
   const finishAndSendRecording = () => {
     recordModeRef.current = 'IDLE';
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop(); // Chạy lệnh stop -> Đánh thức hàm mediaRecorder.onstop
+      mediaRecorderRef.current.stop();
     }
     setIsRecording(false);
     clearInterval(recordingTimerRef.current);
   };
 
-  // HÀM HỦY BỎ (GỠ BỎ BẢN GHI, KHÔNG GỬI)
   const cancelRecordingLocal = () => {
     recordModeRef.current = 'IDLE';
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      // Ghi đè hàm onstop bằng hàm rỗng để không bị gửi đi
       mediaRecorderRef.current.onstop = () => {
         mediaRecorderRef.current.stream.getTracks().forEach((track) => track.stop());
       };
@@ -896,7 +929,6 @@ export default function Home() {
     audioTextRef.current = '';
   };
 
-  // Hàm Up Cloudinary và Whisper gốc của bác (Chỉ điều chỉnh truyền biến)
   const handleUploadAndSendAudio = async (audioBlob) => {
     setIsUploading(true);
     try {
@@ -917,7 +949,6 @@ export default function Home() {
         cloudinaryFormData
       );
 
-      // GỬI LÊN CHAT LUÔN MÀ KHÔNG CẦN CHỜ WHISPER
       socketRef.current.emit('send_message', {
         conversationId: activeConversation._id,
         senderId: currentUser.id,
@@ -927,15 +958,12 @@ export default function Home() {
         replyTo: getReplyData(),
       });
     } catch (error) {
-      alert('Gửi ghi âm thất bại!');
+      showToast('Gửi ghi âm thất bại!', 'error');
     } finally {
       setIsUploading(false);
     }
   };
 
-  // ==========================================
-  // CÁC HÀM UI KHÁC
-  // ==========================================
   const handleScrollToMessage = (messageId) => {
     const element = document.getElementById(`msg-${messageId}`);
     if (element) {
@@ -969,14 +997,13 @@ export default function Home() {
     return (
       <div className='flex min-h-screen flex-col items-center justify-center bg-[#242526] text-[#b0b3b8]'>
         <p className='mb-4 animate-pulse'>Đang tải dữ liệu...</p>
-
         <a href='/login' className='rounded-lg bg-[#0084ff] px-5 py-2 font-semibold text-white'>
           Đăng nhập để tiếp tục
         </a>
       </div>
     );
 
-  const pinnedMessages = messages.filter((m) => m.isPinned);
+  const pinnedMessages = (messages || []).filter((m) => m && m.isPinned);
   const latestPinnedMsg =
     pinnedMessages.length > 0 ? pinnedMessages[pinnedMessages.length - 1] : null;
 
@@ -1057,6 +1084,73 @@ export default function Home() {
                 className='rounded-xl bg-[#0084ff] px-6 py-2 font-semibold text-white shadow-md transition hover:bg-[#0073e6]'
               >
                 Lưu thay đổi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- 🔥 MODAL XÁC NHẬN CHẶN NGƯỜI DÙNG 🔥 --- */}
+      {showBlockModal && (
+        <div className='absolute inset-0 z-[500] flex items-center justify-center bg-black/60 backdrop-blur-sm transition-opacity'>
+          <div
+            className='animate-in zoom-in-95 flex w-[380px] flex-col overflow-hidden rounded-2xl border border-gray-700 bg-[#242526] shadow-2xl'
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className='relative flex items-center justify-center border-b border-gray-700 p-4'>
+              <h2 className='text-[18px] font-bold text-red-500'>Chặn người dùng này?</h2>
+            </div>
+            <div className='p-5 text-center'>
+              <p className='text-[14px] text-[#e4e6eb]'>
+                Người này sẽ không thể gọi điện hoặc gửi tin nhắn cho bạn được nữa.
+              </p>
+            </div>
+            <div className='flex justify-end gap-3 border-t border-gray-700 bg-[#242526] p-4'>
+              <button
+                onClick={() => setShowBlockModal(false)}
+                className='rounded-xl px-5 py-2 font-semibold text-[#b0b3b8] transition hover:bg-[#3a3b3c]'
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleBlockUser}
+                className='rounded-xl bg-red-500 px-6 py-2 font-semibold text-white shadow-md transition hover:bg-red-600'
+              >
+                Chặn
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- 🔥 MODAL XÁC NHẬN XÓA CUỘC TRÒ CHUYỆN 🔥 --- */}
+      {showDeleteChatModal && (
+        <div className='absolute inset-0 z-[500] flex items-center justify-center bg-black/60 backdrop-blur-sm transition-opacity'>
+          <div
+            className='animate-in zoom-in-95 flex w-[380px] flex-col overflow-hidden rounded-2xl border border-gray-700 bg-[#242526] shadow-2xl'
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className='relative flex items-center justify-center border-b border-gray-700 p-4'>
+              <h2 className='text-[18px] font-bold text-red-500'>Xóa toàn bộ cuộc trò chuyện?</h2>
+            </div>
+            <div className='p-5 text-center'>
+              <p className='text-[14px] text-[#e4e6eb]'>
+                Hành động này không thể hoàn tác. Bạn sẽ xóa toàn bộ tin nhắn và gỡ cuộc trò chuyện
+                này khỏi danh sách.
+              </p>
+            </div>
+            <div className='flex justify-end gap-3 border-t border-gray-700 bg-[#242526] p-4'>
+              <button
+                onClick={() => setShowDeleteChatModal(false)}
+                className='rounded-xl px-5 py-2 font-semibold text-[#b0b3b8] transition hover:bg-[#3a3b3c]'
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleDeleteChat}
+                className='rounded-xl bg-red-500 px-6 py-2 font-semibold text-white shadow-md transition hover:bg-red-600'
+              >
+                Xóa vĩnh viễn
               </button>
             </div>
           </div>
@@ -1214,6 +1308,7 @@ export default function Home() {
           setShowEmojiPicker(false);
           setShowStickerPicker(false);
           setShowSettingsMenu(false);
+          setShowChatHeaderMenu(false);
         }}
       >
         {/* ==================================================== */}
@@ -1516,7 +1611,10 @@ export default function Home() {
                 <button
                   onClick={() => {
                     if (recallOption === 'everyone') handleRecallMessage(recallModalData._id);
-                    else setMessages((prev) => prev.filter((m) => m._id !== recallModalData._id));
+                    else
+                      setMessages((prev) =>
+                        Array.isArray(prev) ? prev.filter((m) => m._id !== recallModalData._id) : []
+                      );
                     setRecallModalData(null);
                   }}
                   className='rounded-lg bg-[#0084ff] px-6 py-2 font-semibold text-white transition hover:bg-[#0073e6]'
@@ -1592,7 +1690,7 @@ export default function Home() {
                   onClick={() => {
                     navigator.clipboard.writeText(mobileMenuMsg.text);
                     setMobileMenuMsg(null);
-                    alert('Đã sao chép vào khay nhớ tạm!');
+                    showToast('Đã sao chép vào khay nhớ tạm!');
                   }}
                   className='flex flex-col items-center gap-2.5 px-2'
                 >
@@ -1669,12 +1767,13 @@ export default function Home() {
             />
           </div>
           <div className='flex-1 overflow-y-auto'>
-            {conversations.length === 0 && (
+            {(conversations || []).length === 0 && (
               <p className='mt-4 text-center text-sm text-gray-500'>
                 Chưa có đoạn chat nào, hãy bấm ✏️ để bắt đầu!
               </p>
             )}
-            {conversations.map((conv) => {
+            {(conversations || []).map((conv) => {
+              if (!conv) return null;
               const isGroup = conv.isGroup;
               let name = 'Người dùng';
               let avatar = DEFAULT_AVATAR;
@@ -1683,12 +1782,14 @@ export default function Home() {
                 name = conv.groupName || 'Nhóm không tên';
                 avatar = conv.groupAvatar || DEFAULT_GROUP_AVATAR;
               } else {
-                let partner = conv.participants?.find((p) => (p._id || p) !== currentUser.id);
-                if (!partner) partner = conv.participants?.[0];
+                let partner = (conv.participants || []).find(
+                  (p) => (p._id || p) !== currentUser.id
+                );
+                if (!partner && conv.participants) partner = conv.participants[0];
                 if (partner) {
                   name = partner.name || 'Người dùng';
                   avatar = partner.avatar || DEFAULT_AVATAR;
-                  isOnline = onlineUsers.includes(partner._id || partner);
+                  isOnline = (onlineUsers || []).includes(partner._id || partner);
                 }
               }
               return (
@@ -1725,7 +1826,9 @@ export default function Home() {
                           conv.latestMessage.senderId === currentUser.id;
                         const realSenderId =
                           conv.latestMessage.senderId?._id || conv.latestMessage.senderId;
-                        const senderObj = conv.participants?.find((p) => p._id === realSenderId);
+                        const senderObj = (conv.participants || []).find(
+                          (p) => p._id === realSenderId
+                        );
                         const senderNameParts = senderObj?.name?.split(' ') || [];
                         const shortName = senderNameParts[senderNameParts.length - 1] || 'Ai đó';
                         const prefix = isMine ? 'Bạn' : shortName;
@@ -1780,16 +1883,17 @@ export default function Home() {
                   if (activeConversation.isGroup) {
                     headerName = activeConversation.groupName || 'Nhóm';
                     headerAvatar = activeConversation.groupAvatar || DEFAULT_GROUP_AVATAR;
-                    headerSubText = `${activeConversation.participants?.length || 0} thành viên`;
+                    headerSubText = `${(activeConversation.participants || []).length} thành viên`;
                   } else {
-                    let partner = activeConversation.participants?.find(
+                    let partner = (activeConversation.participants || []).find(
                       (p) => (p._id || p) !== currentUser.id
                     );
-                    if (!partner) partner = activeConversation.participants?.[0];
+                    if (!partner && activeConversation.participants)
+                      partner = activeConversation.participants[0];
                     if (partner) {
                       headerName = partner.name || 'Người dùng';
                       headerAvatar = partner.avatar || DEFAULT_AVATAR;
-                      showOnlineDot = onlineUsers.includes(partner._id || partner);
+                      showOnlineDot = (onlineUsers || []).includes(partner._id || partner);
                       headerSubText = showOnlineDot
                         ? 'Đang hoạt động'
                         : partner.lastSeen
@@ -1844,11 +1948,13 @@ export default function Home() {
                       >
                         🎥
                       </button>
+
+                      {/* 🔥 MENU CHAT TÙY CHỌN BÊN PHẢI CÙNG (DÙNG CHUNG CHO NHÓM VÀ CÁ NHÂN) */}
                       {activeConversation.isGroup ? (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            fetchGroupMembersDetail(); // Lấy danh sách thành viên hiện tại
+                            fetchGroupMembersDetail();
                             setShowGroupSettingsModal(true);
                           }}
                           className='flex h-9 w-9 items-center justify-center rounded-full text-[20px] transition hover:bg-[#3a3b3c]'
@@ -1856,16 +1962,47 @@ export default function Home() {
                           ⋮
                         </button>
                       ) : (
-                        <button className='flex h-9 w-9 items-center justify-center rounded-full text-[20px] transition hover:bg-[#3a3b3c]'>
-                          ⋮
-                        </button>
+                        <div className='relative flex items-center'>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowChatHeaderMenu(!showChatHeaderMenu);
+                            }}
+                            className='flex h-9 w-9 items-center justify-center rounded-full text-[20px] transition hover:bg-[#3a3b3c]'
+                          >
+                            ⋮
+                          </button>
+                          {showChatHeaderMenu && (
+                            <div className='absolute top-full right-0 z-50 mt-2 w-48 overflow-hidden rounded-xl border border-gray-700 bg-[#242526] shadow-xl'>
+                              <div
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setShowBlockModal(true);
+                                }}
+                                className='cursor-pointer px-4 py-3 text-[14px] font-medium text-[#e4e6eb] transition hover:bg-[#3a3b3c]'
+                              >
+                                🚫 Chặn người dùng
+                              </div>
+                              <div className='border-t border-gray-700'></div>
+                              <div
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setShowDeleteChatModal(true);
+                                }}
+                                className='cursor-pointer px-4 py-3 text-[14px] font-medium text-red-500 transition hover:bg-[#3a3b3c]'
+                              >
+                                🗑️ Xóa đoạn chat
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>
                 );
               })()}
 
-              {pinnedMessages.length > 0 && (
+              {pinnedMessages.length > 0 && latestPinnedMsg && (
                 <div
                   onClick={(e) => {
                     e.stopPropagation();
@@ -1899,13 +2036,17 @@ export default function Home() {
               )}
 
               <div className='min-h-0 flex-1 space-y-1.5 overflow-y-auto overscroll-contain p-4'>
-                {messages.map((msg, index) => {
+                {(messages || []).map((msg, index) => {
+                  if (!msg) return null;
                   const isMine =
                     msg.senderId?._id === currentUser.id || msg.senderId === currentUser.id;
-                  const isOnlyEmoji = /^[\p{Extended_Pictographic}\s]+$/u.test(msg.text);
+                  const isOnlyEmoji =
+                    typeof msg.text === 'string'
+                      ? /^[\p{Extended_Pictographic}\s]+$/u.test(msg.text)
+                      : false;
                   const isSticker =
                     msg.messageType === 'image' && msg.mediaUrl?.includes('?type=sticker');
-                  const isLastMessage = index === messages.length - 1;
+                  const isLastMessage = index === (messages || []).length - 1;
 
                   const HoverActions = () => {
                     const visibilityClass =
@@ -2123,7 +2264,6 @@ export default function Home() {
                                         src={msg.mediaUrl}
                                         className='h-[40px] w-[200px] outline-none sm:w-[240px]'
                                       />
-                                      {/* 🔥 NÚT BẤM ĐỂ DỊCH AUDIO THÀNH CHỮ (ICON "A") */}
                                       <button
                                         onClick={(e) => {
                                           e.stopPropagation();
@@ -2135,17 +2275,13 @@ export default function Home() {
                                         A/文
                                       </button>
                                     </div>
-
-                                    {/* KHU VỰC HIỂN THỊ CHỮ */}
-                                    {/* 1. Lịch sử cũ có sẵn chữ từ Whisper */}
                                     {msg.text && msg.text !== '🎤 Đã gửi một tin nhắn thoại' ? (
                                       <div
                                         className={`mt-1.5 px-2 pb-1 text-[14px] leading-relaxed font-medium opacity-95 ${isMine ? 'text-white' : 'text-[#e4e6eb]'}`}
                                       >
                                         {msg.text}
                                       </div>
-                                    ) : /* 2. Chữ vừa được người dùng bấm dịch xong */
-                                    translatedMessages[msg._id] ? (
+                                    ) : translatedMessages[msg._id] ? (
                                       <div
                                         className={`mt-1.5 border-t ${isMine ? 'border-white/20' : 'border-gray-500/30'} px-2 pt-1.5 pb-1 text-[14px] leading-relaxed font-medium opacity-95 ${isMine ? 'text-white' : 'text-[#e4e6eb]'}`}
                                       >
@@ -2280,10 +2416,11 @@ export default function Home() {
                             {(() => {
                               let seenAvatar = DEFAULT_AVATAR;
                               if (activeConversation && !activeConversation.isGroup) {
-                                let partner = activeConversation.participants?.find(
+                                let partner = (activeConversation.participants || []).find(
                                   (p) => (p._id || p) !== currentUser.id
                                 );
-                                if (!partner) partner = activeConversation.participants?.[0];
+                                if (!partner && activeConversation.participants)
+                                  partner = activeConversation.participants[0];
                                 if (partner) seenAvatar = partner.avatar || DEFAULT_AVATAR;
                               }
                               return (
@@ -2332,7 +2469,6 @@ export default function Home() {
               {/* KHU VỰC NHẬP TIN NHẮN CHÍNH */}
               {/* ==================================================== */}
               <div className='flex flex-col border-t border-transparent bg-[#242526]'>
-                {/* Thanh thông báo Đang trả lời tin nhắn */}
                 {replyingTo && (
                   <div className='animate-in slide-in-from-bottom-2 flex items-center justify-between border-t border-gray-700/50 bg-[#242526] px-4 py-2'>
                     <div className='flex flex-col overflow-hidden'>
@@ -2362,11 +2498,8 @@ export default function Home() {
                   </div>
                 )}
 
-                {/* KIỂM TRA: NẾU ĐANG BẬT BẢNG GHI ÂM THÌ HIỂN THỊ CÁI NÀY, KHÔNG THÌ HIỆN KHUNG CHAT BÌNH THƯỜNG */}
                 {showAudioRecorder ? (
-                  /* 🔥 BẢNG GHI ÂM MỚI (INLINE CHUẨN ZALO TỪNG MILIMET) 🔥 */
                   <div className='flex w-full flex-col bg-[#242526]'>
-                    {/* Nút Đóng (X) ở góc trên bên phải */}
                     <div className='flex justify-end p-3 pb-0'>
                       <button
                         onClick={() => {
@@ -2378,14 +2511,21 @@ export default function Home() {
                         ✕
                       </button>
                     </div>
-
                     <div className='flex flex-col items-center pt-2 pb-8'>
-                      {/* Hiển thị thời gian, chữ dịch live hoặc hướng dẫn */}
                       <div className='mb-6 flex min-h-[40px] w-full max-w-[90%] flex-col items-center justify-center text-center'>
                         {isRecording ? (
-                          audioMode === 'text' && audioText ? (
-                            <p className='text-[16px] text-[#e4e6eb] italic'>"{audioText}"</p>
-                          ) : (
+                          <div className='flex w-full flex-col items-center gap-2'>
+                            <div className='min-h-[24px] w-full px-2 text-center'>
+                              {audioText ? (
+                                <p className='line-clamp-2 text-[15px] text-[#e4e6eb] italic'>
+                                  "{audioText}"
+                                </p>
+                              ) : (
+                                <p className='animate-pulse text-[14px] text-gray-500 italic'>
+                                  Đang nghe...
+                                </p>
+                              )}
+                            </div>
                             <div className='flex items-center gap-3'>
                               <span className='h-3.5 w-3.5 animate-pulse rounded-full bg-red-500'></span>
                               <span className='font-mono text-4xl tracking-wider text-[#0084ff]'>
@@ -2395,17 +2535,14 @@ export default function Home() {
                                 :{(recordingTime % 60).toString().padStart(2, '0')}
                               </span>
                             </div>
-                          )
+                          </div>
                         ) : (
                           <span className='text-[15px] font-medium text-[#b0b3b8]'>
                             Bấm hoặc bấm giữ để ghi âm
                           </span>
                         )}
                       </div>
-
-                      {/* Cụm Nút Điều khiển Trung tâm */}
                       <div className='relative flex w-full items-center justify-center'>
-                        {/* Nút Hủy (Trash) - Xuất hiện bên trái khi đang khóa thu âm */}
                         {isRecording && (
                           <button
                             onClick={cancelRecordingLocal}
@@ -2415,8 +2552,6 @@ export default function Home() {
                             🗑️
                           </button>
                         )}
-
-                        {/* NÚT MICRO BỰ BÀ CHÀ BÁ CHÍNH GIỮA */}
                         <button
                           onPointerDown={handlePressStart}
                           onPointerUp={handlePressEnd}
@@ -2429,8 +2564,6 @@ export default function Home() {
                         >
                           {isRecording && recordModeRef.current === 'LOCKED' ? '⏹' : '🎤'}
                         </button>
-
-                        {/* Nút Gửi (Mũi tên) - Xuất hiện bên phải khi đang khóa thu âm */}
                         {isRecording && recordModeRef.current === 'LOCKED' && (
                           <button
                             onClick={finishAndSendRecording}
@@ -2442,8 +2575,6 @@ export default function Home() {
                         )}
                       </div>
                     </div>
-
-                    {/* 2 Tabs chuyển đổi chế độ thu âm ở dưới cùng */}
                     <div className='flex w-full border-t border-gray-700/50 bg-[#18191a]/50'>
                       <button
                         onClick={() => {
@@ -2472,7 +2603,6 @@ export default function Home() {
                     </div>
                   </div>
                 ) : (
-                  /* --- KHUNG NHẬP CHÍNH (GÕ CHỮ BÌNH THƯỜNG) --- */
                   <div
                     className='relative flex w-full shrink-0 items-center gap-1.5 p-2 px-2 sm:gap-2 sm:p-3 sm:px-4'
                     onClick={(e) => e.stopPropagation()}
@@ -2512,7 +2642,6 @@ export default function Home() {
                       >
                         🧸
                       </button>
-                      {/* BẤM NÚT NÀY SẼ MỞ BẢNG GHI ÂM RA */}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -2562,7 +2691,6 @@ export default function Home() {
                       {inputText.trim() ? 'Gửi' : '👍'}
                     </button>
 
-                    {/* Các bảng Sticker và Emoji */}
                     {showStickerPicker && (
                       <div className='absolute bottom-16 left-20 z-50 flex h-[340px] w-[320px] flex-col overflow-hidden rounded-xl border border-gray-700 bg-[#242526] shadow-2xl'>
                         <div className='flex items-center gap-1 overflow-x-auto border-b border-gray-700 bg-[#3a3b3c]/50 p-2'>
@@ -2580,25 +2708,25 @@ export default function Home() {
                           ))}
                         </div>
                         <div className='grid flex-1 grid-cols-4 gap-2 overflow-y-auto p-3'>
-                          {STICKER_PACKS.find((p) => p.id === activeStickerTab)?.stickers.map(
-                            (url, idx) => (
-                              <div
-                                key={idx}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleSendSticker(url);
-                                }}
-                                className='flex cursor-pointer items-center justify-center rounded-xl p-1.5 transition-colors hover:bg-[#3a3b3c]/80'
-                              >
-                                <img
-                                  src={url || undefined}
-                                  alt='Sticker'
-                                  className='h-16 w-16 object-contain drop-shadow-sm transition-transform duration-200 hover:scale-110'
-                                  referrerPolicy='no-referrer'
-                                />
-                              </div>
-                            )
-                          )}
+                          {(
+                            STICKER_PACKS.find((p) => p.id === activeStickerTab)?.stickers || []
+                          ).map((url, idx) => (
+                            <div
+                              key={idx}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSendSticker(url);
+                              }}
+                              className='flex cursor-pointer items-center justify-center rounded-xl p-1.5 transition-colors hover:bg-[#3a3b3c]/80'
+                            >
+                              <img
+                                src={url || undefined}
+                                alt='Sticker'
+                                className='h-16 w-16 object-contain drop-shadow-sm transition-transform duration-200 hover:scale-110'
+                                referrerPolicy='no-referrer'
+                              />
+                            </div>
+                          ))}
                         </div>
                       </div>
                     )}
@@ -2635,7 +2763,7 @@ export default function Home() {
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                alert('Chức năng Tin nhắn đang hoạt động!');
+                showToast('Chức năng Tin nhắn đang hoạt động!');
               }}
               className='flex h-10 w-10 items-center justify-center rounded-full bg-gray-700 hover:bg-gray-600'
             >
@@ -2644,7 +2772,7 @@ export default function Home() {
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                alert('Chức năng Danh bạ đang phát triển!');
+                showToast('Chức năng Danh bạ đang phát triển!');
               }}
               className='flex h-10 w-10 items-center justify-center rounded-full text-xl hover:bg-gray-700'
             >
@@ -2653,7 +2781,7 @@ export default function Home() {
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                alert('Chức năng Cửa hàng đang phát triển!');
+                showToast('Chức năng Cửa hàng đang phát triển!');
               }}
               className='flex h-10 w-10 items-center justify-center rounded-full text-xl hover:bg-gray-700'
             >
