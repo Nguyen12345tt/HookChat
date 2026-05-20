@@ -561,6 +561,32 @@ export default function Home() {
   };
 
   const handleTranslate = async (msg) => {
+    // BÓC BĂNG GHI ÂM SAU KHI BẤM NÚT (CHUẨN ZALO)
+    const handleTranscribeAudio = async (msg) => {
+      if (translatedMessages[msg._id]) return; // Nếu dịch rồi thì thôi
+      try {
+        // Mượn tạm State Loading để UX mượt hơn (hoặc bác có thể tự tạo State riêng)
+        setTranslatedMessages((prev) => ({ ...prev, [msg._id]: '⏳ Đang bóc băng...' }));
+
+        const whisperRes = await axios.post(
+          'https://hookchat-e6ad.onrender.com/api/openai/transcribe',
+          {
+            audioUrl: msg.mediaUrl,
+          }
+        );
+
+        if (whisperRes.data.text) {
+          setTranslatedMessages((prev) => ({ ...prev, [msg._id]: whisperRes.data.text }));
+        } else {
+          setTranslatedMessages((prev) => ({
+            ...prev,
+            [msg._id]: 'Không nhận diện được giọng nói.',
+          }));
+        }
+      } catch (error) {
+        setTranslatedMessages((prev) => ({ ...prev, [msg._id]: '❌ Lỗi bóc băng!' }));
+      }
+    };
     if (translatedMessages[msg._id]) return;
     try {
       const response = await axios.post('https://hookchat-e6ad.onrender.com/api/openai/translate', {
@@ -624,28 +650,24 @@ export default function Home() {
         let finalText = audioTextRef.current;
         if (recognitionRef.current) recognitionRef.current.stop();
 
-        // 1. Nếu đang chọn Tab "Gửi chữ"
+        // 1. Nếu đang chọn Tab "Gửi chữ" (Gửi dạng văn bản)
         if (currentAudioModeRef.current === 'text') {
           if (finalText.trim()) {
-            socketRef.current.emit('send_message', {
-              conversationId: activeConversation._id,
-              senderId: currentUser.id,
-              text: finalText,
-              messageType: 'text',
-              mediaUrl: '',
-              replyTo: getReplyData(),
-            });
+            // 🔥 NÓI XONG -> CHÈN VÀO KHUNG NHẬP CHỮ, KHÔNG GỬI TỰ ĐỘNG!
+            setInputText((prev) => (prev ? prev + ' ' + finalText.trim() : finalText.trim()));
+            // Đóng bảng ghi âm để người dùng thấy ô chữ và tự bấm Gửi
+            setShowAudioRecorder(false);
+            setTimeout(() => inputRef.current?.focus(), 100);
           }
           setAudioText('');
         }
         // 2. Nếu đang chọn Tab "Gửi âm thanh"
         else {
-          await handleUploadAndSendAudio(audioBlob, finalText);
+          // Gửi file ghi âm đi luôn
+          await handleUploadAndSendAudio(audioBlob);
+          setShowAudioRecorder(false);
+          setReplyingTo(null);
         }
-
-        // Đóng bảng ghi âm về mặc định
-        setShowAudioRecorder(false);
-        setReplyingTo(null);
       };
 
       // Bật bộ Dịch Live (Web Speech API)
@@ -728,7 +750,7 @@ export default function Home() {
   };
 
   // Hàm Up Cloudinary và Whisper gốc của bác (Chỉ điều chỉnh truyền biến)
-  const handleUploadAndSendAudio = async (audioBlob, fallbackText) => {
+  const handleUploadAndSendAudio = async (audioBlob) => {
     setIsUploading(true);
     try {
       const sigResponse = await axios.get(
@@ -741,37 +763,23 @@ export default function Home() {
       cloudinaryFormData.append('api_key', api_key);
       cloudinaryFormData.append('timestamp', timestamp);
       cloudinaryFormData.append('signature', signature);
-      cloudinaryFormData.append('folder', 'chat_images');
+      cloudinaryFormData.append('folder', 'chat_audio');
 
       const uploadRes = await axios.post(
         `https://api.cloudinary.com/v1_1/${cloud_name}/auto/upload`,
         cloudinaryFormData
       );
-      const uploadedAudioUrl = uploadRes.data.secure_url;
 
-      let transcribedText = '🎤 Đã gửi một tin nhắn thoại';
-      try {
-        const whisperRes = await axios.post(
-          'https://hookchat-e6ad.onrender.com/api/openai/transcribe',
-          { audioUrl: uploadedAudioUrl }
-        );
-        if (whisperRes.data.text) {
-          transcribedText = `🎤 ${whisperRes.data.text}`;
-        }
-      } catch (err) {
-        if (fallbackText) transcribedText = `🎤 ${fallbackText}`;
-      }
-
+      // GỬI LÊN CHAT LUÔN MÀ KHÔNG CẦN CHỜ WHISPER
       socketRef.current.emit('send_message', {
         conversationId: activeConversation._id,
         senderId: currentUser.id,
-        text: transcribedText,
+        text: '🎤 Đã gửi một tin nhắn thoại',
         messageType: 'audio',
-        mediaUrl: uploadedAudioUrl,
+        mediaUrl: uploadRes.data.secure_url,
         replyTo: getReplyData(),
       });
     } catch (error) {
-      console.error('LỖI GHI ÂM CHI TIẾT:', error);
       alert('Gửi ghi âm thất bại!');
     } finally {
       setIsUploading(false);
@@ -1725,18 +1733,41 @@ export default function Home() {
                                   <div
                                     className={`${isMine ? 'bg-[#0084ff]' : 'bg-[#3a3b3c]'} flex flex-col rounded-[20px] p-2 shadow-sm`}
                                   >
-                                    <audio
-                                      controls
-                                      src={msg.mediaUrl}
-                                      className='h-[40px] w-[220px] outline-none sm:w-[260px]'
-                                    />
-                                    {msg.text && msg.text !== '🎤 Đã gửi một tin nhắn thoại' && (
+                                    <div className='flex items-center gap-2'>
+                                      <audio
+                                        controls
+                                        src={msg.mediaUrl}
+                                        className='h-[40px] w-[200px] outline-none sm:w-[240px]'
+                                      />
+                                      {/* 🔥 NÚT BẤM ĐỂ DỊCH AUDIO THÀNH CHỮ (ICON "A") */}
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleTranscribeAudio(msg);
+                                        }}
+                                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-black/20 text-[13px] font-bold transition hover:bg-black/40 ${isMine ? 'text-white' : 'text-[#e4e6eb]'}`}
+                                        title='Chuyển thành văn bản'
+                                      >
+                                        A/文
+                                      </button>
+                                    </div>
+
+                                    {/* KHU VỰC HIỂN THỊ CHỮ */}
+                                    {/* 1. Lịch sử cũ có sẵn chữ từ Whisper */}
+                                    {msg.text && msg.text !== '🎤 Đã gửi một tin nhắn thoại' ? (
                                       <div
                                         className={`mt-1.5 px-2 pb-1 text-[14px] leading-relaxed font-medium opacity-95 ${isMine ? 'text-white' : 'text-[#e4e6eb]'}`}
                                       >
                                         {msg.text}
                                       </div>
-                                    )}
+                                    ) : /* 2. Chữ vừa được người dùng bấm dịch xong */
+                                    translatedMessages[msg._id] ? (
+                                      <div
+                                        className={`mt-1.5 border-t ${isMine ? 'border-white/20' : 'border-gray-500/30'} px-2 pt-1.5 pb-1 text-[14px] leading-relaxed font-medium opacity-95 ${isMine ? 'text-white' : 'text-[#e4e6eb]'}`}
+                                      >
+                                        {translatedMessages[msg._id]}
+                                      </div>
+                                    ) : null}
                                   </div>
                                 ) : msg.messageType === 'image' ? (
                                   isSticker ? (
