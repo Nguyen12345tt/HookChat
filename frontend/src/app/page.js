@@ -393,17 +393,28 @@ export default function Home() {
     }, 2000);
   };
 
+  // 🔥 HÀM TẠO DỮ LIỆU TRẢ LỜI ĐỂ KẸP VÀO TIN NHẮN
+  const getReplyData = () => {
+    if (!replyingTo) return null;
+    return {
+      messageId: replyingTo._id,
+      text: replyingTo.text,
+      messageType: replyingTo.messageType,
+      senderName: replyingTo.senderId?.name || 'Người dùng',
+    };
+  };
+
   // Gửi tin nhắn Text
   const handleSendMessage = () => {
     if (!inputText.trim() || !activeConversation) return;
-    const msgData = {
+    socketRef.current.emit('send_message', {
       conversationId: activeConversation._id,
       senderId: currentUser.id,
       text: inputText,
       messageType: 'text',
       mediaUrl: '',
-    };
-    socketRef.current.emit('send_message', msgData);
+      replyTo: getReplyData(), // Kẹp dữ liệu vào
+    });
     setDrafts((prev) => {
       const newDrafts = { ...prev };
       delete newDrafts[activeConversation._id];
@@ -429,8 +440,10 @@ export default function Home() {
       text: '👍',
       messageType: 'text',
       mediaUrl: '',
+      replyTo: getReplyData(),
     });
     setShowEmojiPicker(false);
+    setReplyingTo(null);
   };
 
   // Gỡ/Thu hồi tin nhắn
@@ -531,9 +544,11 @@ export default function Home() {
         text: 'Đã gửi một ảnh',
         messageType: 'image',
         mediaUrl: uploadResponse.data.secure_url,
+        replyTo: getReplyData(),
       });
+      setReplyingTo(null);
     } catch (error) {
-      alert('Up ảnh thất bại, check tab Console nhé!');
+      alert('Up ảnh thất bại!');
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -549,8 +564,10 @@ export default function Home() {
       text: 'Đã gửi một nhãn dán',
       messageType: 'image',
       mediaUrl: stickerUrl,
+      replyTo: getReplyData(),
     });
     setShowStickerPicker(false);
+    setReplyingTo(null);
   };
 
   // Bấm vào tin nhắn ghim để cuộn tới tin nhắn đó
@@ -1348,134 +1365,165 @@ export default function Home() {
                           </div>
                         )}
                         {isMine && !msg.isRecalled && <HoverActions />}
-                        <div className='relative'>
-                          {msg.isPinned && (
-                            <div className='absolute -top-2 -left-2 z-10 flex h-[20px] w-[20px] items-center justify-center rounded-full bg-[#e41e3f] shadow-sm ring-2 ring-[#242526]'>
-                              <svg width='12' height='12' viewBox='0 0 24 24' fill='white'>
-                                <path d='M16 12V4h1V2H7v2h1v8l-2 2v2h4.2v6h1.6v-6H16v-2l-2-2z' />
-                              </svg>
+
+                        {/* 🔥 BỌC BẰNG FLEX-COL ĐỂ XẾP CHỒNG BONG BÓNG TRẢ LỜI LÊN TRÊN 🔥 */}
+                        <div
+                          className={`flex flex-col ${isMine ? 'items-end' : 'items-start'} relative`}
+                        >
+                          {/* 💡 BONG BÓNG TRÍCH DẪN (CHỈ HIỆN KHI CÓ TRẢ LỜI) */}
+                          {msg.replyTo && !msg.isRecalled && (
+                            <div
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleScrollToMessage(msg.replyTo.messageId);
+                              }}
+                              className={`mb-1 flex max-w-[200px] cursor-pointer flex-col rounded-2xl bg-[#3a3b3c]/50 px-3 py-1.5 text-[12.5px] text-[#b0b3b8] opacity-70 transition-opacity hover:opacity-100 sm:max-w-xs ${isMine ? 'items-end' : 'items-start'}`}
+                            >
+                              <span className='mb-0.5 flex items-center font-semibold text-[#e4e6eb]'>
+                                <span className='mr-1 text-[13px]'>↩</span>
+                                {msg.replyTo.senderName === currentUser.name
+                                  ? 'Đã trả lời chính mình'
+                                  : `Đã trả lời ${msg.replyTo.senderName}`}
+                              </span>
+                              <span
+                                className={`w-full truncate ${isMine ? 'text-right' : 'text-left'}`}
+                              >
+                                {msg.replyTo.messageType === 'image'
+                                  ? 'Đã gửi một ảnh'
+                                  : msg.replyTo.messageType === 'call'
+                                    ? '📞 Cuộc gọi'
+                                    : msg.replyTo.text}
+                              </span>
                             </div>
                           )}
-                          {msg.isRecalled ? (
-                            <div className='max-w-md rounded-[18px] border border-gray-600 bg-transparent px-4 py-2 text-[15px] text-[#b0b3b8] italic select-none'>
-                              Tin nhắn đã thu hồi
-                            </div>
-                          ) : (
-                            <>
-                              {msg.messageType === 'image' ? (
-                                isSticker ? (
-                                  <img
-                                    src={msg.mediaUrl || undefined}
-                                    alt='Sticker'
-                                    className='h-[120px] w-[120px] object-contain drop-shadow-lg'
-                                    referrerPolicy='no-referrer'
-                                  />
-                                ) : (
-                                  <div className='max-w-md overflow-hidden rounded-2xl border border-gray-700 bg-[#3a3b3c] p-1'>
+
+                          {/* BONG BÓNG TIN NHẮN CHÍNH (GIỮ NGUYÊN TOÀN BỘ CODE CŨ) */}
+                          <div className='relative'>
+                            {msg.isPinned && (
+                              <div className='absolute -top-2 -left-2 z-10 flex h-[20px] w-[20px] items-center justify-center rounded-full bg-[#e41e3f] shadow-sm ring-2 ring-[#242526]'>
+                                <svg width='12' height='12' viewBox='0 0 24 24' fill='white'>
+                                  <path d='M16 12V4h1V2H7v2h1v8l-2 2v2h4.2v6h1.6v-6H16v-2l-2-2z' />
+                                </svg>
+                              </div>
+                            )}
+                            {msg.isRecalled ? (
+                              <div className='max-w-md rounded-[18px] border border-gray-600 bg-transparent px-4 py-2 text-[15px] text-[#b0b3b8] italic select-none'>
+                                Tin nhắn đã thu hồi
+                              </div>
+                            ) : (
+                              <>
+                                {msg.messageType === 'image' ? (
+                                  isSticker ? (
                                     <img
                                       src={msg.mediaUrl || undefined}
-                                      alt='Hình ảnh'
-                                      className='max-h-64 max-w-xs cursor-pointer rounded-xl object-cover'
+                                      alt='Sticker'
+                                      className='h-[120px] w-[120px] object-contain drop-shadow-lg'
+                                      referrerPolicy='no-referrer'
                                     />
-                                  </div>
-                                )
-                              ) : msg.messageType === 'call' ? (
-                                /* 🔥 BƯỚC 4: GIAO DIỆN BONG BÓNG CUỘC GỌI CHUẨN APP 🔥 */
-                                (() => {
-                                  let icon = '📞';
-                                  let title = isMine ? 'Cuộc gọi đi' : 'Cuộc gọi đến';
-                                  let subtitle = msg.text;
-                                  let titleColor = '#e4e6eb';
-                                  let subtitleColor = '#b0b3b8';
-
-                                  if (msg.text === 'canceled') {
-                                    title = isMine ? 'Cuộc gọi đi' : 'Cuộc gọi nhỡ';
-                                    subtitle = isMine ? 'Bạn đã hủy' : 'Bị nhỡ';
-                                    if (!isMine) {
+                                  ) : (
+                                    <div className='max-w-md overflow-hidden rounded-2xl border border-gray-700 bg-[#3a3b3c] p-1'>
+                                      <img
+                                        src={msg.mediaUrl || undefined}
+                                        alt='Hình ảnh'
+                                        className='max-h-64 max-w-xs cursor-pointer rounded-xl object-cover'
+                                      />
+                                    </div>
+                                  )
+                                ) : msg.messageType === 'call' ? (
+                                  (() => {
+                                    let icon = '📞';
+                                    let title = isMine ? 'Cuộc gọi đi' : 'Cuộc gọi đến';
+                                    let subtitle = msg.text;
+                                    let titleColor = '#e4e6eb';
+                                    let subtitleColor = '#b0b3b8';
+                                    if (msg.text === 'canceled') {
+                                      title = isMine ? 'Cuộc gọi đi' : 'Cuộc gọi nhỡ';
+                                      subtitle = isMine ? 'Bạn đã hủy' : 'Bị nhỡ';
+                                      if (!isMine) {
+                                        icon = '📵';
+                                        titleColor = '#ff3b30';
+                                        subtitleColor = '#ff3b30';
+                                      }
+                                    } else if (msg.text === 'rejected') {
+                                      title = isMine ? 'Cuộc gọi đi' : 'Cuộc gọi đến';
+                                      subtitle = 'Từ chối';
                                       icon = '📵';
-                                      titleColor = '#ff3b30';
                                       subtitleColor = '#ff3b30';
-                                    }
-                                  } else if (msg.text === 'rejected') {
-                                    title = isMine ? 'Cuộc gọi đi' : 'Cuộc gọi đến';
-                                    subtitle = 'Từ chối';
-                                    icon = '📵';
-                                    subtitleColor = '#ff3b30';
-                                    titleColor = '#ff3b30';
-                                  } else if (msg.text === 'missed') {
-                                    title = isMine ? 'Cuộc gọi đi' : 'Cuộc gọi nhỡ';
-                                    subtitle = isMine ? '0 phút 0 giây' : 'Bị nhỡ';
-                                    if (!isMine) {
-                                      icon = '📵';
                                       titleColor = '#ff3b30';
-                                      subtitleColor = '#ff3b30';
+                                    } else if (msg.text === 'missed') {
+                                      title = isMine ? 'Cuộc gọi đi' : 'Cuộc gọi nhỡ';
+                                      subtitle = isMine ? '0 phút 0 giây' : 'Bị nhỡ';
+                                      if (!isMine) {
+                                        icon = '📵';
+                                        titleColor = '#ff3b30';
+                                        subtitleColor = '#ff3b30';
+                                      }
                                     }
-                                  }
-
-                                  return (
-                                    <div className='flex min-w-[200px] flex-col rounded-2xl border border-gray-700 bg-[#242526] p-3 shadow-sm select-none'>
-                                      <div className='mb-1.5 flex items-center gap-3'>
-                                        <div className='flex h-9 w-9 items-center justify-center rounded-full bg-[#3a3b3c]'>
-                                          <span className='text-[16px]'>{icon}</span>
+                                    return (
+                                      <div className='flex min-w-[200px] flex-col rounded-2xl border border-gray-700 bg-[#242526] p-3 shadow-sm select-none'>
+                                        <div className='mb-1.5 flex items-center gap-3'>
+                                          <div className='flex h-9 w-9 items-center justify-center rounded-full bg-[#3a3b3c]'>
+                                            <span className='text-[16px]'>{icon}</span>
+                                          </div>
+                                          <span
+                                            className='text-[15px] font-semibold'
+                                            style={{ color: titleColor }}
+                                          >
+                                            {title}
+                                          </span>
                                         </div>
                                         <span
-                                          className='text-[15px] font-semibold'
-                                          style={{ color: titleColor }}
+                                          className='mb-2 pl-12 text-[13px] font-medium'
+                                          style={{ color: subtitleColor }}
                                         >
-                                          {title}
+                                          {subtitle}
                                         </span>
+                                        <div className='pl-12'>
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleStartCall('voice');
+                                            }}
+                                            className='w-fit rounded-full bg-[#3a3b3c] px-4 py-1.5 text-[13px] font-semibold text-[#e4e6eb] transition hover:bg-[#4e4f50]'
+                                          >
+                                            Gọi lại
+                                          </button>
+                                        </div>
                                       </div>
-                                      <span
-                                        className='mb-2 pl-12 text-[13px] font-medium'
-                                        style={{ color: subtitleColor }}
-                                      >
-                                        {subtitle}
-                                      </span>
-                                      <div className='pl-12'>
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleStartCall('voice');
-                                          }}
-                                          className='w-fit rounded-full bg-[#3a3b3c] px-4 py-1.5 text-[13px] font-semibold text-[#e4e6eb] transition hover:bg-[#4e4f50]'
-                                        >
-                                          Gọi lại
-                                        </button>
-                                      </div>
-                                    </div>
-                                  );
-                                })()
-                              ) : isOnlyEmoji ? (
-                                <div className='pb-1 text-[44px] leading-none drop-shadow-md'>
-                                  {msg.text}
-                                </div>
-                              ) : (
-                                <div
-                                  className={`${isMine ? 'bg-[#0084ff] text-white' : 'bg-[#3a3b3c] text-[#e4e6eb]'} max-w-md rounded-[18px] px-3.5 py-2 text-[15px]`}
-                                >
-                                  {msg.text}
-                                </div>
-                              )}
-                            </>
-                          )}
-                          {/* Hiển thị danh sách Reaction của tin nhắn */}
-                          {msg.reactions && msg.reactions.length > 0 && !msg.isRecalled && (
-                            <div
-                              className={`absolute -bottom-2 ${isMine ? 'right-0' : 'left-0'} z-10 flex origin-bottom scale-90 items-center rounded-full border border-gray-700 bg-[#242526] px-1.5 py-[1px] shadow-md`}
-                            >
-                              {[...new Set(msg.reactions.map((r) => r.emoji))].map((emo, idx) => (
-                                <span key={idx} className='text-[13px]'>
-                                  {emo}
-                                </span>
-                              ))}
-                              {msg.reactions.length > 1 && (
-                                <span className='ml-1 text-[11px] font-medium text-[#b0b3b8]'>
-                                  {msg.reactions.length}
-                                </span>
-                              )}
-                            </div>
-                          )}
+                                    );
+                                  })()
+                                ) : isOnlyEmoji ? (
+                                  <div className='pb-1 text-[44px] leading-none drop-shadow-md'>
+                                    {msg.text}
+                                  </div>
+                                ) : (
+                                  <div
+                                    className={`${isMine ? 'bg-[#0084ff] text-white' : 'bg-[#3a3b3c] text-[#e4e6eb]'} max-w-md rounded-[18px] px-3.5 py-2 text-[15px]`}
+                                  >
+                                    {msg.text}
+                                  </div>
+                                )}
+                              </>
+                            )}
+                            {msg.reactions && msg.reactions.length > 0 && !msg.isRecalled && (
+                              <div
+                                className={`absolute -bottom-2 ${isMine ? 'right-0' : 'left-0'} z-10 flex origin-bottom scale-90 items-center rounded-full border border-gray-700 bg-[#242526] px-1.5 py-[1px] shadow-md`}
+                              >
+                                {[...new Set(msg.reactions.map((r) => r.emoji))].map((emo, idx) => (
+                                  <span key={idx} className='text-[13px]'>
+                                    {emo}
+                                  </span>
+                                ))}
+                                {msg.reactions.length > 1 && (
+                                  <span className='ml-1 text-[11px] font-medium text-[#b0b3b8]'>
+                                    {msg.reactions.length}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
+
                         {!isMine && !msg.isRecalled && <HoverActions />}
                       </div>
                       {/* Avatar thu nhỏ báo hiệu người nhận đã đọc */}
