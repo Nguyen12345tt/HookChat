@@ -128,6 +128,136 @@ router.post("/conversation/group", async (req, res) => {
     res.status(500).json({ message: "Lỗi" });
   }
 });
+// ======================= QUẢN LÝ NHÓM =======================
+
+// 1. Thêm thành viên vào nhóm (chỉ chủ nhóm hoặc admin)
+router.post("/group/add-members", async (req, res) => {
+  try {
+    const { groupId, userIds, requesterId } = req.body;
+    const conversation = await Conversation.findById(groupId);
+    if (!conversation || !conversation.isGroup)
+      return res.status(404).json({ message: "Không tìm thấy nhóm" });
+    // Kiểm tra quyền: requesterId phải là chủ nhóm (admins[0])
+    if (conversation.admins[0].toString() !== requesterId)
+      return res
+        .status(403)
+        .json({ message: "Bạn không có quyền thêm thành viên" });
+    // Lọc những người chưa có trong nhóm
+    const newMembers = userIds.filter(
+      (id) => !conversation.participants.includes(id),
+    );
+    if (newMembers.length === 0)
+      return res
+        .status(400)
+        .json({ message: "Không có thành viên mới để thêm" });
+    conversation.participants.push(...newMembers);
+    await conversation.save();
+    res.json({
+      message: "Thêm thành viên thành công",
+      participants: conversation.participants,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Lỗi server", error });
+  }
+});
+
+// 2. Xóa thành viên khỏi nhóm (chỉ chủ nhóm, không thể xóa chính mình)
+router.post("/group/remove-member", async (req, res) => {
+  try {
+    const { groupId, memberId, requesterId } = req.body;
+    const conversation = await Conversation.findById(groupId);
+    if (!conversation || !conversation.isGroup)
+      return res.status(404).json({ message: "Không tìm thấy nhóm" });
+    if (conversation.admins[0].toString() !== requesterId)
+      return res
+        .status(403)
+        .json({ message: "Bạn không có quyền xóa thành viên" });
+    if (memberId === requesterId)
+      return res
+        .status(400)
+        .json({
+          message: "Bạn không thể tự xóa mình, hãy dùng chức năng rời nhóm",
+        });
+    conversation.participants = conversation.participants.filter(
+      (id) => id.toString() !== memberId,
+    );
+    await conversation.save();
+    res.json({
+      message: "Xóa thành viên thành công",
+      participants: conversation.participants,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Lỗi server", error });
+  }
+});
+
+// 3. Rời nhóm (thành viên tự rời)
+router.post("/group/leave", async (req, res) => {
+  try {
+    const { groupId, userId } = req.body;
+    const conversation = await Conversation.findById(groupId);
+    if (!conversation || !conversation.isGroup)
+      return res.status(404).json({ message: "Không tìm thấy nhóm" });
+    if (!conversation.participants.includes(userId))
+      return res.status(400).json({ message: "Bạn không ở trong nhóm này" });
+    // Nếu là chủ nhóm thì không cho rời mà phải giải tán hoặc chuyển quyền
+    if (conversation.admins[0].toString() === userId) {
+      return res
+        .status(400)
+        .json({
+          message:
+            "Chủ nhóm không thể rời nhóm, hãy giải tán hoặc chuyển quyền",
+        });
+    }
+    conversation.participants = conversation.participants.filter(
+      (id) => id.toString() !== userId,
+    );
+    await conversation.save();
+    res.json({ message: "Rời nhóm thành công" });
+  } catch (error) {
+    res.status(500).json({ message: "Lỗi server", error });
+  }
+});
+
+// 4. Chuyển quyền nhóm (chủ nhóm chỉ định người khác làm chủ mới)
+router.post("/group/transfer-ownership", async (req, res) => {
+  try {
+    const { groupId, currentOwnerId, newOwnerId } = req.body;
+    const conversation = await Conversation.findById(groupId);
+    if (!conversation || !conversation.isGroup)
+      return res.status(404).json({ message: "Không tìm thấy nhóm" });
+    if (conversation.admins[0].toString() !== currentOwnerId)
+      return res.status(403).json({ message: "Bạn không phải chủ nhóm" });
+    if (!conversation.participants.includes(newOwnerId))
+      return res
+        .status(400)
+        .json({ message: "Người nhận không có trong nhóm" });
+    // Cập nhật chủ nhóm: thay đổi admins[0] thành newOwnerId
+    conversation.admins = [newOwnerId];
+    await conversation.save();
+    res.json({ message: "Chuyển quyền nhóm thành công", newOwnerId });
+  } catch (error) {
+    res.status(500).json({ message: "Lỗi server", error });
+  }
+});
+
+// 5. Giải tán nhóm (chỉ chủ nhóm, xóa luôn conversation)
+router.post("/group/dismiss", async (req, res) => {
+  try {
+    const { groupId, requesterId } = req.body;
+    const conversation = await Conversation.findById(groupId);
+    if (!conversation || !conversation.isGroup)
+      return res.status(404).json({ message: "Không tìm thấy nhóm" });
+    if (conversation.admins[0].toString() !== requesterId)
+      return res.status(403).json({ message: "Bạn không phải chủ nhóm" });
+    await Conversation.findByIdAndDelete(groupId);
+    // Có thể xóa toàn bộ tin nhắn liên quan đến nhóm này (tuỳ chọn)
+    await Message.deleteMany({ conversationId: groupId });
+    res.json({ message: "Nhóm đã được giải tán" });
+  } catch (error) {
+    res.status(500).json({ message: "Lỗi server", error });
+  }
+});
 
 router.get("/conversations/user/:userId", async (req, res) => {
   try {
