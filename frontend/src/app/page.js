@@ -345,134 +345,6 @@ export default function Home() {
       }
     }
 
-    // Lấy danh sách thành viên chi tiết (từ activeConversation.participants)
-    const fetchGroupMembersDetail = () => {
-      if (!activeConversation?.isGroup) return;
-      setGroupMembersList(activeConversation.participants || []);
-    };
-
-    // Thêm thành viên
-    const handleAddMembers = async () => {
-      if (!activeConversation || selectedNewMembers.length === 0) return;
-      setIsProcessingGroup(true);
-      try {
-        await axios.post(`https://hookchat-e6ad.onrender.com/api/chat/group/add-members`, {
-          groupId: activeConversation._id,
-          userIds: selectedNewMembers,
-          requesterId: currentUser.id,
-        });
-        // Refresh conversations
-        const res = await axios.get(
-          `https://hookchat-e6ad.onrender.com/api/chat/conversations/user/${currentUser.id}`
-        );
-        setConversations(res.data);
-        const updatedConv = res.data.find((c) => c._id === activeConversation._id);
-        if (updatedConv) setActiveConversation(updatedConv);
-        setSelectedNewMembers([]);
-        showToast('Đã thêm thành viên!', 'success');
-      } catch (error) {
-        showToast('Thêm thất bại!', 'error');
-      } finally {
-        setIsProcessingGroup(false);
-      }
-    };
-
-    // Kick thành viên (chỉ chủ nhóm)
-    const handleKickMember = async (memberId) => {
-      if (!confirm('Bạn có chắc muốn xóa thành viên này khỏi nhóm?')) return;
-      setIsProcessingGroup(true);
-      try {
-        await axios.post(`https://hookchat-e6ad.onrender.com/api/chat/group/remove-member`, {
-          groupId: activeConversation._id,
-          memberId: memberId,
-          requesterId: currentUser.id,
-        });
-        const res = await axios.get(
-          `https://hookchat-e6ad.onrender.com/api/chat/conversations/user/${currentUser.id}`
-        );
-        setConversations(res.data);
-        const updatedConv = res.data.find((c) => c._id === activeConversation._id);
-        if (updatedConv) setActiveConversation(updatedConv);
-        showToast('Đã xóa thành viên', 'success');
-      } catch (error) {
-        showToast('Xóa thất bại', 'error');
-      } finally {
-        setIsProcessingGroup(false);
-      }
-    };
-
-    // Rời nhóm (thành viên thường)
-    const handleLeaveGroup = async () => {
-      if (!confirm('Bạn có chắc muốn rời khỏi nhóm này?')) return;
-      setIsProcessingGroup(true);
-      try {
-        await axios.post(`https://hookchat-e6ad.onrender.com/api/chat/group/leave`, {
-          groupId: activeConversation._id,
-          userId: currentUser.id,
-        });
-        // Reload conversations và đóng chat
-        const res = await axios.get(
-          `https://hookchat-e6ad.onrender.com/api/chat/conversations/user/${currentUser.id}`
-        );
-        setConversations(res.data);
-        setActiveConversation(null);
-        showToast('Bạn đã rời nhóm', 'success');
-      } catch (error) {
-        showToast('Rời nhóm thất bại', 'error');
-      } finally {
-        setIsProcessingGroup(false);
-        setShowGroupSettingsModal(false);
-      }
-    };
-
-    // Chuyển quyền nhóm (chủ nhóm)
-    const handleTransferOwnership = async (newOwnerId, newOwnerName) => {
-      if (!confirm(`Bạn có chắc muốn chuyển quyền nhóm cho ${newOwnerName}?`)) return;
-      setIsProcessingGroup(true);
-      try {
-        await axios.post(`https://hookchat-e6ad.onrender.com/api/chat/group/transfer-ownership`, {
-          groupId: activeConversation._id,
-          currentOwnerId: currentUser.id,
-          newOwnerId: newOwnerId,
-        });
-        const res = await axios.get(
-          `https://hookchat-e6ad.onrender.com/api/chat/conversations/user/${currentUser.id}`
-        );
-        setConversations(res.data);
-        const updatedConv = res.data.find((c) => c._id === activeConversation._id);
-        if (updatedConv) setActiveConversation(updatedConv);
-        showToast(`Đã chuyển quyền nhóm cho ${newOwnerName}`, 'success');
-      } catch (error) {
-        showToast('Chuyển quyền thất bại', 'error');
-      } finally {
-        setIsProcessingGroup(false);
-        setShowGroupSettingsModal(false);
-      }
-    };
-
-    // Giải tán nhóm (chủ nhóm)
-    const handleDismissGroup = async () => {
-      if (!confirm('Giải tán nhóm sẽ xóa toàn bộ tin nhắn và thành viên. Bạn chắc chắn?')) return;
-      setIsProcessingGroup(true);
-      try {
-        await axios.post(`https://hookchat-e6ad.onrender.com/api/chat/group/dismiss`, {
-          groupId: activeConversation._id,
-          requesterId: currentUser.id,
-        });
-        const res = await axios.get(
-          `https://hookchat-e6ad.onrender.com/api/chat/conversations/user/${currentUser.id}`
-        );
-        setConversations(res.data);
-        setActiveConversation(null);
-        showToast('Nhóm đã được giải tán', 'success');
-      } catch (error) {
-        showToast('Giải tán thất bại', 'error');
-      } finally {
-        setIsProcessingGroup(false);
-        setShowGroupSettingsModal(false);
-      }
-    };
-
     const callData = {
       callerId: currentUser.id,
       callerName: currentUser.name,
@@ -486,6 +358,132 @@ export default function Home() {
 
     setOutgoingCall(callData);
     socketRef.current.emit('initiate_call', callData);
+  };
+
+  // Lấy danh sách thành viên chi tiết (từ activeConversation.participants)
+  const fetchGroupMembersDetail = () => {
+    if (!activeConversation?.isGroup) return;
+    setGroupMembersList(activeConversation.participants || []);
+  };
+
+  // Thêm thành viên
+  const handleAddMembers = async () => {
+    if (!activeConversation || selectedNewMembers.length === 0) return;
+    setIsProcessingGroup(true);
+    try {
+      await axios.post(`https://hookchat-e6ad.onrender.com/api/chat/group/add-members`, {
+        groupId: activeConversation._id,
+        userIds: selectedNewMembers,
+        requesterId: currentUser.id,
+      });
+      const res = await axios.get(
+        `https://hookchat-e6ad.onrender.com/api/chat/conversations/user/${currentUser.id}`
+      );
+      setConversations(res.data);
+      const updatedConv = res.data.find((c) => c._id === activeConversation._id);
+      if (updatedConv) setActiveConversation(updatedConv);
+      setSelectedNewMembers([]);
+      showToast('Đã thêm thành viên!', 'success');
+    } catch (error) {
+      showToast('Thêm thất bại!', 'error');
+    } finally {
+      setIsProcessingGroup(false);
+    }
+  };
+
+  // Kick thành viên (chỉ chủ nhóm)
+  const handleKickMember = async (memberId) => {
+    if (!confirm('Bạn có chắc muốn xóa thành viên này khỏi nhóm?')) return;
+    setIsProcessingGroup(true);
+    try {
+      await axios.post(`https://hookchat-e6ad.onrender.com/api/chat/group/remove-member`, {
+        groupId: activeConversation._id,
+        memberId: memberId,
+        requesterId: currentUser.id,
+      });
+      const res = await axios.get(
+        `https://hookchat-e6ad.onrender.com/api/chat/conversations/user/${currentUser.id}`
+      );
+      setConversations(res.data);
+      const updatedConv = res.data.find((c) => c._id === activeConversation._id);
+      if (updatedConv) setActiveConversation(updatedConv);
+      showToast('Đã xóa thành viên', 'success');
+    } catch (error) {
+      showToast('Xóa thất bại', 'error');
+    } finally {
+      setIsProcessingGroup(false);
+    }
+  };
+
+  // Rời nhóm (thành viên thường)
+  const handleLeaveGroup = async () => {
+    if (!confirm('Bạn có chắc muốn rời khỏi nhóm này?')) return;
+    setIsProcessingGroup(true);
+    try {
+      await axios.post(`https://hookchat-e6ad.onrender.com/api/chat/group/leave`, {
+        groupId: activeConversation._id,
+        userId: currentUser.id,
+      });
+      const res = await axios.get(
+        `https://hookchat-e6ad.onrender.com/api/chat/conversations/user/${currentUser.id}`
+      );
+      setConversations(res.data);
+      setActiveConversation(null);
+      showToast('Bạn đã rời nhóm', 'success');
+    } catch (error) {
+      showToast('Rời nhóm thất bại', 'error');
+    } finally {
+      setIsProcessingGroup(false);
+      setShowGroupSettingsModal(false);
+    }
+  };
+
+  // Chuyển quyền nhóm (chủ nhóm)
+  const handleTransferOwnership = async (newOwnerId, newOwnerName) => {
+    if (!confirm(`Bạn có chắc muốn chuyển quyền nhóm cho ${newOwnerName}?`)) return;
+    setIsProcessingGroup(true);
+    try {
+      await axios.post(`https://hookchat-e6ad.onrender.com/api/chat/group/transfer-ownership`, {
+        groupId: activeConversation._id,
+        currentOwnerId: currentUser.id,
+        newOwnerId: newOwnerId,
+      });
+      const res = await axios.get(
+        `https://hookchat-e6ad.onrender.com/api/chat/conversations/user/${currentUser.id}`
+      );
+      setConversations(res.data);
+      const updatedConv = res.data.find((c) => c._id === activeConversation._id);
+      if (updatedConv) setActiveConversation(updatedConv);
+      showToast(`Đã chuyển quyền nhóm cho ${newOwnerName}`, 'success');
+    } catch (error) {
+      showToast('Chuyển quyền thất bại', 'error');
+    } finally {
+      setIsProcessingGroup(false);
+      setShowGroupSettingsModal(false);
+    }
+  };
+
+  // Giải tán nhóm (chủ nhóm)
+  const handleDismissGroup = async () => {
+    if (!confirm('Giải tán nhóm sẽ xóa toàn bộ tin nhắn và thành viên. Bạn chắc chắn?')) return;
+    setIsProcessingGroup(true);
+    try {
+      await axios.post(`https://hookchat-e6ad.onrender.com/api/chat/group/dismiss`, {
+        groupId: activeConversation._id,
+        requesterId: currentUser.id,
+      });
+      const res = await axios.get(
+        `https://hookchat-e6ad.onrender.com/api/chat/conversations/user/${currentUser.id}`
+      );
+      setConversations(res.data);
+      setActiveConversation(null);
+      showToast('Nhóm đã được giải tán', 'success');
+    } catch (error) {
+      showToast('Giải tán thất bại', 'error');
+    } finally {
+      setIsProcessingGroup(false);
+      setShowGroupSettingsModal(false);
+    }
   };
 
   const handleCreateNewChat = async () => {
