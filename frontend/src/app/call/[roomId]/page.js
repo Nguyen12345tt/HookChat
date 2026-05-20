@@ -1,22 +1,21 @@
 'use client';
-import { useEffect, useRef, use } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useRef } from 'react';
+import { useRouter, useSearchParams, useParams } from 'next/navigation';
 import { io } from 'socket.io-client';
 
-export default function CallPage({ params }) {
+export default function CallPage() {
   const containerRef = useRef(null);
   const zegoInstanceRef = useRef(null);
 
   const router = useRouter();
+  const params = useParams();
   const searchParams = useSearchParams();
   const callType = searchParams.get('type');
-
-  const unwrappedParams = use(params);
-  const roomID = unwrappedParams.roomId;
+  const roomID = Array.isArray(params?.roomId) ? params.roomId[0] : params?.roomId;
 
   useEffect(() => {
     const initCall = async () => {
-      if (!roomID) return;
+      if (!roomID || !containerRef.current) return;
       if (zegoInstanceRef.current) return;
 
       zegoInstanceRef.current = 'LOADING';
@@ -34,6 +33,11 @@ export default function CallPage({ params }) {
         // Điền serverSecret và appID trong zegoCloud
         const appID = 2003933466;
         const serverSecret = process.env.NEXT_PUBLIC_ZEGO_SECRET;
+        if (!serverSecret) {
+          alert('Thiếu cấu hình cuộc gọi. Vui lòng thử lại sau!');
+          router.replace('/');
+          return;
+        }
 
         // Tự tạo Token ngay tại máy tính trình duyệt
         const kitToken = ZegoUIKitPrebuilt.generateKitTokenForTest(
@@ -126,6 +130,8 @@ export default function CallPage({ params }) {
       } catch (error) {
         console.error('Lỗi khởi tạo cuộc gọi:', error);
         zegoInstanceRef.current = null;
+        alert('Không thể tải trang cuộc gọi. Vui lòng thử lại!');
+        router.replace('/');
       }
     };
 
