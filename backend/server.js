@@ -38,7 +38,6 @@ app.use("/api/auth", authRoutes);
 const io = new Server(server, {
   cors: {
     origin: ["http://localhost:3000", "https://hook-chat-three.vercel.app"],
-
     methods: ["GET", "POST", "PUT"],
   },
 });
@@ -107,6 +106,33 @@ io.on("connection", (socket) => {
     } catch (error) {}
   });
 
+  // 🔥 LỖI Ở ĐÂY: ĐÃ THÊM LẠI BIẾN replyTo CHO BÁC
+  socket.on("send_message", async (data) => {
+    const { conversationId, senderId, text, messageType, mediaUrl, replyTo } =
+      data;
+    try {
+      const newMessage = new Message({
+        conversationId,
+        senderId,
+        text,
+        messageType,
+        mediaUrl,
+        replyTo, // 🔥 Kẹp thông tin trả lời vào đây để DB lưu
+      });
+      await newMessage.save();
+      await Conversation.findByIdAndUpdate(conversationId, {
+        latestMessage: newMessage._id,
+      });
+      const populatedMsg = await Message.findById(newMessage._id).populate(
+        "senderId",
+        "name avatar",
+      );
+      io.to(conversationId).emit("receive_message", populatedMsg);
+    } catch (error) {
+      console.log("Lỗi gửi tin nhắn:", error);
+    }
+  });
+
   socket.on("recall_message", async (data) => {
     const { messageId, conversationId } = data;
     try {
@@ -120,39 +146,34 @@ io.on("connection", (socket) => {
     } catch (error) {}
   });
 
-  // --- THÊM ĐOẠN NÀY ĐỂ XỬ LÝ ĐỔ CHUÔNG ---
   socket.on("initiate_call", (data) => {
-    // Phát tín hiệu cho toàn bộ những người dùng khác trong server
     socket.broadcast.emit("incoming_call", data);
   });
 
-  // 🔥 THÊM SỰ KIỆN NÀY: MÁY B BÁO CHO MÁY A BIẾT LÀ ĐÃ BẤM NGHE MÁY
   socket.on("accept_call", (data) => {
     socket.broadcast.emit("call_accepted", data);
   });
 
-  socket.on("send_message", async (data) => {
-    // 🔥 Lấy thêm biến replyTo từ Frontend gửi lên
-    const { conversationId, senderId, text, messageType, mediaUrl, replyTo } =
-      data;
+  socket.on("react_message", async (data) => {
+    const { messageId, userId, emoji, conversationId } = data;
     try {
-      const newMessage = new Message({
-        conversationId,
-        senderId,
-        text,
-        messageType,
-        mediaUrl,
-        replyTo, // 🔥 Lưu vào Database
-      });
-      await newMessage.save();
-      await Conversation.findByIdAndUpdate(conversationId, {
-        latestMessage: newMessage._id,
-      });
-      const populatedMsg = await Message.findById(newMessage._id).populate(
+      const msg = await Message.findById(messageId).populate(
         "senderId",
         "name avatar",
       );
-      io.to(conversationId).emit("receive_message", populatedMsg);
+      if (!msg) return;
+      const existingReactionIndex = msg.reactions.findIndex(
+        (r) => r.userId.toString() === userId,
+      );
+      if (existingReactionIndex !== -1) {
+        if (msg.reactions[existingReactionIndex].emoji === emoji)
+          msg.reactions.splice(existingReactionIndex, 1);
+        else msg.reactions[existingReactionIndex].emoji = emoji;
+      } else {
+        msg.reactions.push({ emoji, userId });
+      }
+      await msg.save();
+      io.to(conversationId).emit("update_message", msg);
     } catch (error) {}
   });
 });
