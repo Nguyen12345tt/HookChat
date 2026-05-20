@@ -17,7 +17,7 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    // 🔥 FIX SAFARI 1: Bọc trong kiểm tra window để tránh lỗi Hydration của Next.js
+    // Vẫn giữ để nếu có ai gửi link /login?mode=register thì nó tự mở form đăng ký lúc tải trang
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const mode = params.get('mode');
@@ -62,10 +62,8 @@ export default function Login() {
         setEmail('');
         setPassword('');
 
-        // 🔥 FIX SAFARI 2: Tự động đổi State về Form Đăng Nhập (không cần tải lại trang)
+        // 🔥 FIX SAFARI 16: Chỉ đổi State tại chỗ, TUYỆT ĐỐI KHÔNG gọi router.replace('/login')
         setIsLoginMode(true);
-        // Dùng Next.js Router để xóa chữ ?mode=register trên thanh địa chỉ an toàn
-        router.replace('/login');
       }
     } catch (err) {
       // Bắt lỗi từ Backend trả về (như sai pass, trùng email...)
@@ -166,14 +164,13 @@ export default function Login() {
           </form>
 
           <div className='mt-6 text-center'>
-            {/* 🔥 FIX SAFARI 3: Đổi thẻ <a> thành thẻ <button> chuyển State mượt mà */}
+            {/* 🔥 FIX SAFARI 16: Chỉ thay đổi State để trượt Form, KHÔNG GỌI router.push */}
             {isLoginMode ? (
               <button
                 type='button'
                 onClick={() => {
                   setError(''); // Xóa lỗi cũ nếu có
-                  setIsLoginMode(false);
-                  router.push('/login?mode=register');
+                  setIsLoginMode(false); // Chuyển Form tại chỗ
                 }}
                 className='inline-flex min-h-[44px] cursor-pointer items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold text-blue-600 transition hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/30'
               >
@@ -184,8 +181,7 @@ export default function Login() {
                 type='button'
                 onClick={() => {
                   setError(''); // Xóa lỗi cũ nếu có
-                  setIsLoginMode(true);
-                  router.push('/login');
+                  setIsLoginMode(true); // Chuyển Form tại chỗ
                 }}
                 className='inline-flex min-h-[44px] cursor-pointer items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold text-blue-600 transition hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/30'
               >
