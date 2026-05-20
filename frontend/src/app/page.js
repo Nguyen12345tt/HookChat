@@ -1084,7 +1084,7 @@ export default function Home() {
 
             <div className='flex-1 overflow-y-auto p-4'>
               {/* Thêm thành viên (chỉ chủ nhóm) */}
-              {activeConversation.admins?.includes(currentUser.id) && (
+              {activeConversation.admins?.[0]?._id === currentUser.id && (
                 <div className='mb-6'>
                   <h3 className='mb-2 text-[15px] font-semibold text-[#e4e6eb]'>Thêm thành viên</h3>
                   <div className='flex flex-wrap gap-2'>
@@ -1161,7 +1161,7 @@ export default function Home() {
                         </div>
                       </div>
                       <div className='flex gap-2'>
-                        {!isCreator && activeConversation.admins?.includes(currentUser.id) && (
+                        {!isCreator && activeConversation.admins?.[0]?._id === currentUser.id && (
                           <>
                             <button
                               onClick={() => handleTransferOwnership(memberId, memberName)}
@@ -1192,7 +1192,7 @@ export default function Home() {
               </div>
 
               {/* Nút giải tán (chỉ chủ nhóm) */}
-              {activeConversation.admins?.includes(currentUser.id) && (
+              {activeConversation.admins?.[0]?._id === currentUser.id && (
                 <div className='mt-6 border-t border-gray-700 pt-4'>
                   <button
                     onClick={handleDismissGroup}
