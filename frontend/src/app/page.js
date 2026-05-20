@@ -1199,62 +1199,73 @@ export default function Home() {
                         : 'opacity-0 group-hover:opacity-100';
                     const popupPlacementClass =
                       popupPosition === 'up' ? 'bottom-full mb-1' : 'top-full mt-1';
+
+                    // 🔥 BƯỚC 1: KIỂM TRA XEM CÓ PHẢI LÀ TIN NHẮN CUỘC GỌI KHÔNG
+                    const isCallMsg = msg.messageType === 'call';
+
                     return (
                       <div
                         className={`flex items-center gap-1 text-[#b0b3b8] transition-opacity ${isMine ? 'mr-2' : 'ml-2'} ${visibilityClass}`}
                       >
-                        {/* Biểu tượng Reaction (Thả tim) */}
-                        <div className='relative flex items-center'>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (activeReactionId === msg._id) setActiveReactionId(null);
-                              else {
-                                setActiveReactionId(msg._id);
-                                setOpenMenuId(null);
-                                setPopupPosition(e.clientY < 300 ? 'down' : 'up');
-                              }
-                            }}
-                            className='flex h-8 w-8 items-center justify-center rounded-full text-[18px] transition hover:bg-[#3a3b3c] hover:text-[#e4e6eb]'
-                          >
-                            🙂
-                          </button>
-                          {activeReactionId === msg._id && (
-                            <div
-                              className={`absolute ${isMine ? 'right-0' : 'left-0'} ${popupPlacementClass} z-50 flex items-center gap-1 rounded-full border border-gray-700 bg-[#242526] px-2 py-1 shadow-[0_0_15px_rgba(0,0,0,0.5)]`}
-                            >
-                              {['❤️', '😆', '😮', '😢', '😡', '👍'].map((emoji) => (
-                                <button
-                                  key={emoji}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    socketRef.current.emit('react_message', {
-                                      messageId: msg._id,
-                                      userId: currentUser.id,
-                                      emoji: emoji,
-                                      conversationId: activeConversation._id,
-                                    });
-                                    setActiveReactionId(null);
-                                  }}
-                                  className='px-1 text-[22px] transition-transform hover:-translate-y-1 hover:scale-125'
+                        {/* 🔥 BƯỚC 2: CHỈ HIỆN NÚT THẢ TIM VÀ TRẢ LỜI NẾU KHÔNG PHẢI LÀ CUỘC GỌI */}
+                        {!isCallMsg && (
+                          <>
+                            {/* Biểu tượng Reaction (Thả tim) */}
+                            <div className='relative flex items-center'>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (activeReactionId === msg._id) setActiveReactionId(null);
+                                  else {
+                                    setActiveReactionId(msg._id);
+                                    setOpenMenuId(null);
+                                    setPopupPosition(e.clientY < 300 ? 'down' : 'up');
+                                  }
+                                }}
+                                className='flex h-8 w-8 items-center justify-center rounded-full text-[18px] transition hover:bg-[#3a3b3c] hover:text-[#e4e6eb]'
+                              >
+                                🙂
+                              </button>
+                              {activeReactionId === msg._id && (
+                                <div
+                                  className={`absolute ${isMine ? 'right-0' : 'left-0'} ${popupPlacementClass} z-50 flex items-center gap-1 rounded-full border border-gray-700 bg-[#242526] px-2 py-1 shadow-[0_0_15px_rgba(0,0,0,0.5)]`}
                                 >
-                                  {emoji}
-                                </button>
-                              ))}
+                                  {['❤️', '😆', '😮', '😢', '😡', '👍'].map((emoji) => (
+                                    <button
+                                      key={emoji}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        socketRef.current.emit('react_message', {
+                                          messageId: msg._id,
+                                          userId: currentUser.id,
+                                          emoji: emoji,
+                                          conversationId: activeConversation._id,
+                                        });
+                                        setActiveReactionId(null);
+                                      }}
+                                      className='px-1 text-[22px] transition-transform hover:-translate-y-1 hover:scale-125'
+                                    >
+                                      {emoji}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
-                        {/* Nút Trả lời (Reply) */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setReplyingTo(msg);
-                          }}
-                          className='flex h-8 w-8 items-center justify-center rounded-full text-[18px] transition hover:bg-[#3a3b3c] hover:text-[#e4e6eb]'
-                        >
-                          ↩️
-                        </button>
-                        {/* Nút Tùy chọn (Thu hồi/Ghim) */}
+
+                            {/* Nút Trả lời (Reply) */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setReplyingTo(msg);
+                              }}
+                              className='flex h-8 w-8 items-center justify-center rounded-full text-[18px] transition hover:bg-[#3a3b3c] hover:text-[#e4e6eb]'
+                            >
+                              ↩️
+                            </button>
+                          </>
+                        )}
+
+                        {/* Nút Tùy chọn 3 chấm (Luôn hiện để lấy nút Xóa) */}
                         <div className='relative flex items-center'>
                           <button
                             onClick={(e) => {
@@ -1274,19 +1285,24 @@ export default function Home() {
                             <div
                               className={`absolute ${isMine ? 'right-0' : 'left-0'} ${popupPlacementClass} z-50 w-[160px] overflow-hidden rounded-xl border border-gray-700 bg-[#242526] py-1.5 shadow-[0_0_15px_rgba(0,0,0,0.5)]`}
                             >
-                              <div
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  socketRef.current.emit('toggle_pin', {
-                                    messageId: msg._id,
-                                    conversationId: activeConversation._id,
-                                  });
-                                  setOpenMenuId(null);
-                                }}
-                                className='flex cursor-pointer items-center justify-between px-4 py-2.5 text-[14px] font-medium text-[#e4e6eb] transition hover:bg-[#3a3b3c]'
-                              >
-                                {msg.isPinned ? 'Bỏ ghim' : 'Ghim'}
-                              </div>
+                              {/* 🔥 BƯỚC 3: CHỈ CHO PHÉP GHIM NẾU KHÔNG PHẢI CUỘC GỌI */}
+                              {!isCallMsg && (
+                                <div
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    socketRef.current.emit('toggle_pin', {
+                                      messageId: msg._id,
+                                      conversationId: activeConversation._id,
+                                    });
+                                    setOpenMenuId(null);
+                                  }}
+                                  className='flex cursor-pointer items-center justify-between px-4 py-2.5 text-[14px] font-medium text-[#e4e6eb] transition hover:bg-[#3a3b3c]'
+                                >
+                                  {msg.isPinned ? 'Bỏ ghim' : 'Ghim'}
+                                </div>
+                              )}
+
+                              {/* Nút Gỡ (Xóa) thì ai cũng được dùng */}
                               <div
                                 onClick={(e) => {
                                   e.stopPropagation();
