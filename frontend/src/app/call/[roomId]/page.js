@@ -141,5 +141,6 @@ export default function CallPage({ params }) {
     };
   }, [roomID, router, callType]);
 
-  return <div className='h-screen w-full bg-[#18191a]' ref={containerRef}></div>;
+  // Thêm class notranslate để cấm cửa hoàn toàn các công cụ dịch chọc ngoáy vào DOM gây crash React
+  return <div className='notranslate h-screen w-full bg-[#18191a]' ref={containerRef}></div>;
 }
