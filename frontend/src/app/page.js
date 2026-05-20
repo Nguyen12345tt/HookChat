@@ -567,9 +567,6 @@ export default function Home() {
     }
   };
 
-  // ==========================================
-  // 🎤 THUẬT TOÁN GHI ÂM (FIX LỖI BẤM / NHẤN GIỮ)
-  // ==========================================
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -578,6 +575,11 @@ export default function Home() {
       if (recordModeRef.current === 'IDLE') {
         stream.getTracks().forEach((t) => t.stop());
         return;
+      }
+
+      // 🔥 CHỐT CHẶN 2: Ép tắt cái Micro cũ nếu bị lỗi bấm đúp (chạm 2 lần)
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
       }
 
       const mediaRecorder = new MediaRecorder(stream);
@@ -620,6 +622,30 @@ export default function Home() {
         setReplyingTo(null);
       };
 
+      // ==========================================
+      // 🎤 THUẬT TOÁN GHI ÂM (FIX LỖI BẤM / NHẤN GIỮ)
+      // ==========================================
+      // KHI BẮT ĐẦU CHẠM TAY VÀO NÚT MICRO
+      const handlePressStart = (e) => {
+        if (recordModeRef.current === 'LOCKED') {
+          // Nếu nó đang khóa thu âm từ trước, bấm cái nữa là GỬI
+          finishAndSendRecording();
+          return;
+        }
+
+        if (recordModeRef.current === 'IDLE') {
+          recordModeRef.current = 'HOLDING';
+          touchStartTimerRef.current = Date.now();
+          currentAudioModeRef.current = audioMode;
+
+          // 🔥 CHỐT CHẶN 1: Dọn sạch mọi bộ đếm cũ ngay khi vừa chạm tay
+          clearInterval(recordingTimerRef.current);
+          setRecordingTime(0);
+
+          startRecording();
+        }
+      };
+
       // Bật bộ Dịch Live (Web Speech API)
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (SpeechRecognition) {
@@ -640,30 +666,20 @@ export default function Home() {
 
       mediaRecorder.start();
       setIsRecording(true);
+
+      // 🔥 CHỐT CHẶN 3: Đảm bảo chém đứt bộ đếm lần cuối trước khi tạo cái mới
+      clearInterval(recordingTimerRef.current);
       setRecordingTime(0);
-      setAudioText('');
       audioTextRef.current = '';
-      recordingTimerRef.current = setInterval(() => setRecordingTime((prev) => prev + 1), 1000);
+
+      // Bắt đầu đếm giây
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingTime((prev) => prev + 1);
+      }, 1000);
     } catch (error) {
       recordModeRef.current = 'IDLE';
       setIsRecording(false);
       alert('Vui lòng cấp quyền Micro trên trình duyệt để ghi âm nhé!');
-    }
-  };
-
-  // KHI BẮT ĐẦU CHẠM TAY VÀO NÚT MICRO
-  const handlePressStart = (e) => {
-    if (recordModeRef.current === 'LOCKED') {
-      // Nếu nó đang khóa thu âm từ trước, bấm cái nữa là GỬI
-      finishAndSendRecording();
-      return;
-    }
-
-    if (recordModeRef.current === 'IDLE') {
-      recordModeRef.current = 'HOLDING';
-      touchStartTimerRef.current = Date.now();
-      currentAudioModeRef.current = audioMode; // Chốt cái tab người dùng đang chọn
-      startRecording();
     }
   };
 
