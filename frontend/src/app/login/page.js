@@ -12,9 +12,17 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  // State quản lý trạng thái tải và lỗi
-  const [error, setError] = useState('');
+  // State quản lý trạng thái tải
   const [isLoading, setIsLoading] = useState(false);
+
+  // 🔥 STATE QUẢN LÝ THÔNG BÁO NỔI (TOAST)
+  const [toast, setToast] = useState(null);
+
+  // Hàm hiển thị Toast (tự động tắt sau 3 giây)
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
 
   useEffect(() => {
     // Vẫn giữ để nếu có ai gửi link /login?mode=register thì nó tự mở form đăng ký lúc tải trang
@@ -32,7 +40,6 @@ export default function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
     setIsLoading(true);
 
     try {
@@ -47,8 +54,11 @@ export default function Login() {
         localStorage.setItem('token', res.data.token);
         localStorage.setItem('user', JSON.stringify(res.data.user));
 
-        // 2. Đá người dùng vào trang Chat (Trang chủ)
-        router.push('/');
+        // 2. Hiện Toast Thành công và đợi 1 giây rồi mới vào trang Chủ cho mượt
+        showToast('Đăng nhập thành công!', 'success');
+        setTimeout(() => {
+          router.push('/');
+        }, 1000);
       } else {
         // GỌI API ĐĂNG KÝ
         await axios.post('https://hookchat-e6ad.onrender.com/api/auth/register', {
@@ -57,24 +67,63 @@ export default function Login() {
           password,
         });
 
-        alert('Đăng ký thành công! Vui lòng đăng nhập lại.');
+        // Hiện Toast Thành công thay vì alert()
+        showToast('Đăng ký thành công! Vui lòng đăng nhập.', 'success');
         setName('');
         setEmail('');
         setPassword('');
 
-        // 🔥 FIX SAFARI 16: Chỉ đổi State tại chỗ, TUYỆT ĐỐI KHÔNG gọi router.replace('/login')
-        setIsLoginMode(true);
+        // 🔥 Tự động trượt về form Login sau 1.5 giây
+        setTimeout(() => {
+          setIsLoginMode(true);
+        }, 1500);
       }
     } catch (err) {
-      // Bắt lỗi từ Backend trả về (như sai pass, trùng email...)
-      setError(err.response?.data?.message || 'Có lỗi xảy ra, vui lòng thử lại!');
+      // Bắt lỗi từ Backend trả về (như sai pass, trùng email...) và hiện Toast Đỏ
+      showToast(err.response?.data?.message || 'Có lỗi xảy ra, vui lòng thử lại!', 'error');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className='flex min-h-screen flex-col justify-center bg-gray-100 py-12 transition-colors duration-300 sm:px-6 lg:px-8 dark:bg-[#18191a]'>
+    <div className='relative flex min-h-screen flex-col justify-center bg-gray-100 py-12 transition-colors duration-300 sm:px-6 lg:px-8 dark:bg-[#18191a]'>
+      {/* --- 🔥 TOAST THÔNG BÁO NỔI GÓC PHẢI TRÊN 🔥 --- */}
+      {toast && (
+        <div className='animate-in slide-in-from-right-8 fade-in fixed top-6 right-4 z-[9999] flex duration-300'>
+          <div className='flex items-center gap-3 rounded-xl border border-gray-700 bg-[#242526] px-4 py-3 shadow-[0_10px_30px_rgba(0,0,0,0.5)]'>
+            {toast.type === 'success' ? (
+              <div className='flex h-8 w-8 items-center justify-center rounded-full bg-green-500/20 text-green-500'>
+                {/* ICON DẤU TÍCH XANH (Thành công) */}
+                <svg
+                  className='h-5 w-5'
+                  fill='none'
+                  viewBox='0 0 24 24'
+                  stroke='currentColor'
+                  strokeWidth={3}
+                >
+                  <path strokeLinecap='round' strokeLinejoin='round' d='M5 13l4 4L19 7' />
+                </svg>
+              </div>
+            ) : (
+              <div className='flex h-8 w-8 items-center justify-center rounded-full bg-red-500/20 text-red-500'>
+                {/* ICON DẤU X ĐỎ (Thất bại) */}
+                <svg
+                  className='h-5 w-5'
+                  fill='none'
+                  viewBox='0 0 24 24'
+                  stroke='currentColor'
+                  strokeWidth={3}
+                >
+                  <path strokeLinecap='round' strokeLinejoin='round' d='M6 18L18 6M6 6l12 12' />
+                </svg>
+              </div>
+            )}
+            <span className='text-[14px] font-medium text-[#e4e6eb]'>{toast.message}</span>
+          </div>
+        </div>
+      )}
+
       <div className='text-center sm:mx-auto sm:w-full sm:max-w-md'>
         <div className='mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-blue-500 shadow-lg'>
           <span className='text-3xl text-white'>💬</span>
@@ -145,13 +194,6 @@ export default function Login() {
               </div>
             </div>
 
-            {/* Khung báo lỗi màu đỏ */}
-            {error && (
-              <div className='rounded bg-red-50 p-2 text-center text-sm text-red-500 dark:bg-red-900/30'>
-                {error}
-              </div>
-            )}
-
             <div>
               <button
                 type='submit'
@@ -169,7 +211,7 @@ export default function Login() {
               <button
                 type='button'
                 onClick={() => {
-                  setError(''); // Xóa lỗi cũ nếu có
+                  setToast(null); // Tắt thông báo cũ nếu có
                   setIsLoginMode(false); // Chuyển Form tại chỗ
                 }}
                 className='inline-flex min-h-[44px] cursor-pointer items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold text-blue-600 transition hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/30'
@@ -180,7 +222,7 @@ export default function Login() {
               <button
                 type='button'
                 onClick={() => {
-                  setError(''); // Xóa lỗi cũ nếu có
+                  setToast(null); // Tắt thông báo cũ nếu có
                   setIsLoginMode(true); // Chuyển Form tại chỗ
                 }}
                 className='inline-flex min-h-[44px] cursor-pointer items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold text-blue-600 transition hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/30'
