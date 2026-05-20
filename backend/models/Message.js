@@ -37,6 +37,14 @@ const MessageSchema = new mongoose.Schema(
     // 6. Thu hổi tin nhắn (Dùng để đánh dấu tin nhắn đã bị thu hồi, có thể hiển thị thông báo "Tin nhắn đã được thu hồi" thay vì nội dung gốc)
     isRecalled: { type: Boolean, default: false },
 
+    replyTo: {
+      massageId: string,
+      text: string,
+      senderName: string,
+      messageType: string,
+      mediaUrl: string,
+    },
+
     // 🔥 THÊM DÒNG NÀY: Mảng lưu trữ cảm xúc
     reactions: [
       {
