@@ -14,9 +14,6 @@ const geistMono = Geist_Mono({
 export const metadata = {
   title: 'HookChat',
   description: 'A simple and intuitive chat application built with React and Node.js.',
-  icons: {
-    icon: '/chat.ico',
-  },
 };
 
 export default function RootLayout({ children }) {
